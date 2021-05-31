@@ -1,4 +1,4 @@
-# Airtable Dokuwiki Sync
+# YouTube Video/Playlist Dokuwiki Embed
 
 A Dokuwiki plugin to sync data from airtable
 
@@ -6,7 +6,8 @@ A Dokuwiki plugin to sync data from airtable
 
 * Go to https://console.cloud.google.com/ and create a google developer account
 * Once registered add a YouTube Data API v3 API to your account.
-* when setting up, restrict the key to only use the youtube data API. You also may want to set an application restriction for a production server.
+* When setting up, restrict the key to only use the youtube data API. You also may want to set an application
+  restriction for a production server.
 
 ## Installation
 

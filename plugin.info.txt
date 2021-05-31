@@ -1,0 +1,7 @@
+base   ytembed
+author Cameron
+email  cameronward007@gmail.com
+date   2021-05-31
+name   ytembed plugin
+desc   Embeds the latest video from a YouTube Playlist
+url    https://www.dokuwiki.org/

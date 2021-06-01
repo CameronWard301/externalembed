@@ -84,8 +84,34 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin
                 break;
 
             case DOKU_LEXER_UNMATCHED :
-                return array('YT_embed' => $match);
+                if(!empty($match)) {
+                    try {
+                        define('YT_API_KEY', $this->getConf('YT_API_KEY'));
+                        define('PLAYLIST_CACHE_TIME', $this->getConf('PLAYLIST_CACHE_TIME'));
+                        if(empty(YT_API_KEY)) throw new InvalidYouTubeEmbed('Empty API Key');
+                        if(empty(PLAYLIST_CACHE_TIME)) throw new InvalidYouTubeEmbed('Empty cache time');
+                        $embed_type = $this->getEmbedType($match);
 
+                        switch(true) {
+                            case ($embed_type === "video"):
+                                $parameter_array = $this->parseVideoString($match);
+                                $yt_request      = $this->getVideoRequest($parameter_array);
+                                $html            = $this->renderYouTubeVideo($yt_request, $parameter_array);
+                                return array('YT_embed_html' => $html);
+                            case ($embed_type === "playlist"):
+                                $parameter_array             = $this->parsePlaylistString($match);
+                                $playlist_cache              = $this->checkCache($parameter_array);
+                                $cached_video_id             = $this->getLatestVideo($playlist_cache);
+                                $parameter_array['video_id'] = $cached_video_id;
+                                $yt_request                  = $this->getVideoRequest($parameter_array);
+                                $html                        = $this->renderYouTubeVideo($yt_request, $parameter_array);
+                                return array('YT_embed_html' => $html);
+                        }
+                    } catch(InvalidYouTubeEmbed $e) {
+                        $html = "<p style='color: red; font-weight: bold;'>YouTube Embed Error: " . $e->getMessage() . "</p>";
+                        return array('YT_embed_html' => $html);
+                    }
+                }
         }
         $data = array();
         return $data;
@@ -102,38 +128,15 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin
      * @noinspection PhpParameterNameChangedDuringInheritanceInspection
      */
     public function render($mode, Doku_Renderer $renderer, $data): bool {
-        if ($mode !== 'xhtml') {
+        if($mode !== 'xhtml') {
             return false;
         }
-        if(!empty($data['YT_embed'])) {
-            try {
-                define('YT_API_KEY', $this->getConf('YT_API_KEY'));
-                define('PLAYLIST_CACHE_TIME', $this->getConf('PLAYLIST_CACHE_TIME'));
-                if(empty(YT_API_KEY)) throw new InvalidYouTubeEmbed('Empty API Key');
-                if(empty(PLAYLIST_CACHE_TIME)) throw new InvalidYouTubeEmbed('Empty cache time');
-                $user_string  = $data['YT_embed'];
-                $embed_type = $this->getEmbedType($user_string);
-
-                switch(true) {
-                    case ($embed_type === "video"):
-                        $parameter_array = $this->parseVideoString($user_string);
-                        $yt_request      = $this->getVideoRequest($parameter_array);
-                        $renderer->doc  .= $this->renderYouTubeVideo($yt_request, $parameter_array);
-                        return true;
-                    case ($embed_type  === "playlist"):
-                        $parameter_array = $this->parsePlaylistString($user_string);
-                        $playlist_cache  = $this->checkCache($parameter_array);
-                        $cached_video_id = $this->getLatestVideo($playlist_cache);
-                        $parameter_array['video_id'] = $cached_video_id;
-                        $yt_request      = $this->getVideoRequest($parameter_array);
-                        $renderer->doc  .= $this->renderYouTubeVideo($yt_request, $parameter_array);
-                }
-            } catch(InvalidYouTubeEmbed $e){
-                $renderer->doc .= "<p style='color: red; font-weight: bold;'>YouTube Embed Error: " . $e->getMessage() . "</p>";
-                return false;
-            }
+        if(!empty($data['YT_embed_html'])) {
+            $renderer->doc .= $data['YT_embed_html'];
+            return true;
+        } else {
+            return false;
         }
-        return true;
     }
 
     /**

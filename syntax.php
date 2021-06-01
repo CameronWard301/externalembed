@@ -336,17 +336,22 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin
      * @throws InvalidYouTubeEmbed
      */
     private function checkCache($parameters){
-        if(file_exists($file_cache = DOKU_INC.'/lib/plugins/ytembed/cache/'.$parameters["playlist_id"].'.json')){
-            if(!$cached_playlist = json_decode(file_get_contents($file_cache), true)){
-                throw new InvalidYouTubeEmbed('Could not open and/or decode existing cache file for playlist: '.$parameters["playlist_id"]);
+        $cache_dir = $GLOBALS["conf"]["cachedir"] . '/plugin_ytembed';
+        if(!file_exists($cache_dir)) {
+            mkdir($cache_dir, 0777, true);
+        }
+        $file_cache = $cache_dir . '/' . $parameters["playlist_id"] . '.json';
+        if(file_exists($file_cache)) {
+            if(!$cached_playlist = json_decode(file_get_contents($file_cache), true)) {
+                throw new InvalidYouTubeEmbed('Could not open and/or decode existing cache file for playlist: ' . $parameters["playlist_id"]);
             }
-            if($cached_playlist['expires'] < time()){ //if the cache has expired:
-                $this->cachePlaylist($parameters); //generate new cache
+            if($cached_playlist['expires'] < time()) { //if the cache has expired:
+                $this->cachePlaylist($parameters, $cache_dir); //generate new cache
             }
         } else { //if file does not exist:
-            $this->cachePlaylist($parameters); //cache the new playlist
+            $this->cachePlaylist($parameters, $cache_dir); //cache the new playlist
         }
-        if(!$cached_playlist = json_decode(file_get_contents($file_cache))){
+        if(!$cached_playlist = json_decode(file_get_contents($file_cache))) {
             throw new InvalidYouTubeEmbed('Could not open and/or decode existing cache file for playlist: '.$parameters["playlist_id"]);
         }
         return $cached_playlist;
@@ -359,27 +364,28 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin
      * Pre-conditions: Cache is expired or does not exist
      *
      * @param $parameters
+     * @param $cache_dir string the directory of the cache to be stored
      * @throws InvalidYouTubeEmbed
      */
-    private function cachePlaylist($parameters) {
-        $video_ids = array();
-        $response = array();
-        $video_ids['expires'] = time() + (PLAYLIST_CACHE_TIME*60*60); //set cache to expire in seconds
+    private function cachePlaylist($parameters, $cache_dir) {
+        $video_ids            = array();
+        $response             = array();
+        $video_ids['expires'] = time() + (PLAYLIST_CACHE_TIME * 60 * 60); //set cache to expire in seconds
 
-        while(key_exists('nextPageToken', $response) || empty($response)){
-            $response = $this->sendPlaylistRequest($parameters, '&pageToken='.$response['nextPageToken']);
-            foreach($response['items'] as $video){
+        while(key_exists('nextPageToken', $response) || empty($response)) {
+            $response = $this->sendPlaylistRequest($parameters, '&pageToken=' . $response['nextPageToken']);
+            foreach($response['items'] as $video) {
                 array_push($video_ids, $video['contentDetails']['videoId']);
             }
         }
 
-        if(file_exists($file_cache = DOKU_INC.'/lib/plugins/ytembed/cache/'.$parameters["playlist_id"].'.json')){
-            if(!unlink($file_cache)){
-                throw new InvalidYouTubeEmbed('Could not delete old cache file for playlist: '. $parameters["playlist_id"]);
+        if(file_exists($file_cache = $cache_dir . '/' . $parameters["playlist_id"] . '.json')) {
+            if(!unlink($file_cache)) {
+                throw new InvalidYouTubeEmbed('Could not delete old cache file for playlist: ' . $parameters["playlist_id"]);
             }
         }
-        if(!$newCache = fopen(DOKU_INC.'/lib/plugins/ytembed/cache/'.$parameters["playlist_id"].'.json', "w")){
-            throw new InvalidYouTubeEmbed('Cannot create cache file: cache/'.$parameters['playlist_id'].'.json');
+        if(!$newCache = fopen($cache_dir . '/' . $parameters["playlist_id"] . '.json', "w")) {
+            throw new InvalidYouTubeEmbed('Cannot create cache file: cache/' . $parameters['playlist_id'] . '.json');
         }
         fwrite($newCache, json_encode($video_ids));
         fclose($newCache);

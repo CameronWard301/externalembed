@@ -16,7 +16,7 @@ if(!defined('DOKU_INC')) {
  *
  * Class InvalidYouTubeEmbed
  */
-class InvalidYouTubeEmbed extends Exception {
+class InvalidEmbed extends Exception {
     public function errorMessage(): string {
         return $this->getMessage();
     }
@@ -84,28 +84,28 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
                     try {
                         define('YT_API_KEY', $this->getConf('YT_API_KEY'));
                         define('PLAYLIST_CACHE_TIME', $this->getConf('PLAYLIST_CACHE_TIME'));
-                        if(empty(YT_API_KEY)) throw new InvalidYouTubeEmbed('Empty API Key');
-                        if(empty(PLAYLIST_CACHE_TIME)) throw new InvalidYouTubeEmbed('Empty cache time');
+                        if(empty(YT_API_KEY)) throw new InvalidEmbed('Empty API Key');
+                        if(empty(PLAYLIST_CACHE_TIME)) throw new InvalidEmbed('Empty cache time');
                         $embed_type = $this->getEmbedType($match);
 
                         switch(true) {
                             case ($embed_type === "video"):
-                                $parameter_array = $this->parseVideoString($match);
+                                $parameter_array = $this->parseYouTubeVideoString($match);
                                 $yt_request      = $this->getVideoRequest($parameter_array);
-                                $html            = $this->renderYouTubeVideo($yt_request, $parameter_array);
-                                return array('YT_embed_html' => $html);
+                                $html            = $this->renderEmbed($yt_request, $parameter_array);
+                                return array('embed_html' => $html);
                             case ($embed_type === "playlist"):
-                                $parameter_array             = $this->parsePlaylistString($match);
+                                $parameter_array             = $this->parseYouTubePlaylistString($match);
                                 $playlist_cache              = $this->checkCache($parameter_array);
                                 $cached_video_id             = $this->getLatestVideo($playlist_cache);
                                 $parameter_array['video_id'] = $cached_video_id;
                                 $yt_request                  = $this->getVideoRequest($parameter_array);
-                                $html                        = $this->renderYouTubeVideo($yt_request, $parameter_array);
-                                return array('YT_embed_html' => $html);
+                                $html                        = $this->renderEmbed($yt_request, $parameter_array);
+                                return array('embed_html' => $html);
                         }
-                    } catch(InvalidYouTubeEmbed $e) {
+                    } catch(InvalidEmbed $e) {
                         $html = "<p style='color: red; font-weight: bold;'>YouTube Embed Error: " . $e->getMessage() . "</p>";
-                        return array('YT_embed_html' => $html);
+                        return array('embed_html' => $html);
                     }
                 }
         }
@@ -127,8 +127,8 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
         if($mode !== 'xhtml') {
             return false;
         }
-        if(!empty($data['YT_embed_html'])) {
-            $renderer->doc .= $data['YT_embed_html'];
+        if(!empty($data['embed_html'])) {
+            $renderer->doc .= $data['embed_html'];
             return true;
         } else {
             return false;
@@ -142,8 +142,8 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
      * @param $parameters
      * @return string
      */
-    private function renderYouTubeVideo($request, $parameters): string {
-        return '<iframe style="border: none;" width="' . $parameters["width"] . '" height="' . $parameters["height"] . '" src="' . $request . '"></iframe>';
+    private function renderEmbed($request, $parameters): string {
+        return '<div class="external-embed" data-disclaimer=""><iframe style="border: none;" width="' . $parameters["width"] . '" height="' . $parameters["height"] . '" src="' . $request . '"></iframe></div>';
     }
 
     /**
@@ -153,24 +153,24 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
      *
      * @param $user_string
      * @return string //either: 'playlist' or 'video'
-     * @throws InvalidYouTubeEmbed
+     * @throws InvalidEmbed
      */
     private function getEmbedType($user_string): string {
         $type = substr($user_string, 0, strpos($user_string, " | "));
 
-        if($type == "") throw new InvalidYouTubeEmbed("Missing Type Parameter / Not Enough Parameters");
+        if($type == "") throw new InvalidEmbed("Missing Type Parameter / Not Enough Parameters");
 
         $decoded_string = explode("type: ", strtolower($type))[1];
         $embed_type     = str_replace('"', '', $decoded_string);
 
-        if($embed_type == null) throw new InvalidYouTubeEmbed("Missing Type Parameter");
+        if($embed_type == null) throw new InvalidEmbed("Missing Type Parameter");
 
         $embed_type = strtolower($embed_type);
 
         $accepted_types = array("playlist", "video");
 
         if(array_search($embed_type, $accepted_types) === false) {
-            throw new InvalidYouTubeEmbed(
+            throw new InvalidEmbed(
                 "Invalid Type Parameter: " . htmlspecialchars($embed_type) . "
             <br>Accepted Types: " . implode(" | ", $accepted_types)
             );
@@ -183,20 +183,20 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
      *
      * @param $user_string
      * @return array //an array of parameter: value, associations
-     * @throws InvalidYouTubeEmbed
+     * @throws InvalidEmbed
      */
-    private function parseVideoString($user_string): array {
+    private function parseYouTubeVideoString($user_string): array {
         $video_parameter_types  = array("type" => true, 'url' => true, 'video_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
         $video_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false']);
         $regex                  = '/^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/';
 
         $parameters = $this->getParameters($user_string);
-        if(!key_exists('url', $parameters)) throw new InvalidYouTubeEmbed('Missing url parameter');
+        if(!key_exists('url', $parameters)) throw new InvalidEmbed('Missing url parameter');
 
         if(preg_match($regex, $parameters['url'], $match)) {
             $parameters['video_id'] = $match[5];
         } else {
-            throw new InvalidYouTubeEmbed('Invalid YouTube URL');
+            throw new InvalidEmbed('Invalid YouTube URL');
         }
 
         return $this->checkParameters($parameters, $video_parameter_types, $video_parameter_values);
@@ -207,15 +207,15 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
      *
      * @param $user_string
      * @return array //an array of parameter: value, associations
-     * @throws InvalidYouTubeEmbed
+     * @throws InvalidEmbed
      */
-    private function parsePlaylistString($user_string): array {
+    private function parseYouTubePlaylistString($user_string): array {
         $playlist_parameter_types  = array("type" => true, 'url' => true, 'playlist_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
         $playlist_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false']);
         $regex                     = '/^.*(youtu.be\/|list=)([^#\&\?]*).*/';
 
         $parameters = $this->getParameters($user_string);
-        if(!key_exists('url', $parameters)) throw new InvalidYouTubeEmbed('Missing url parameter');
+        if(!key_exists('url', $parameters)) throw new InvalidEmbed('Missing url parameter');
 
         if(preg_match($regex, $parameters['url'], $matches)) {
             $parameters['playlist_id'] = $matches[2];
@@ -253,18 +253,18 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
      * @param $required_parameters array
      * @param $parameter_values    array
      * @return array // query array with added default parameters
-     * @throws InvalidYouTubeEmbed
+     * @throws InvalidEmbed
      */
     private function checkParameters(array &$query_array, array $required_parameters, array $parameter_values): array {
         foreach($required_parameters as $key => $value) {
             if(!array_key_exists($key, $query_array)) { // if parameter is missing:
                 if($value === true) { // check if parameter is required
-                    throw new InvalidYouTubeEmbed("Missing Parameter: " . $key);
+                    throw new InvalidEmbed("Missing Parameter: " . $key);
                 }
                 $query_array[$key] = $value; // substitute default
             }
             if(($query_array[$key] == null || $query_array[$key] === "") && $value === true) { //if parameter is required but value is not present
-                throw new InvalidYouTubeEmbed("Missing Parameter Value for: '" . $key . "'.");
+                throw new InvalidEmbed("Missing Parameter Value for: '" . $key . "'.");
             }
             if(array_key_exists($key, $parameter_values)) { //check accepted parameter_values array
                 if(!in_array($query_array[$key], $parameter_values[$key])) { //if parameter value is not accepted:
@@ -273,7 +273,7 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
                     if(in_array("", $parameter_values[$key])) {
                         $message .= " or ''";
                     }
-                    throw new InvalidYouTubeEmbed($message);
+                    throw new InvalidEmbed($message);
                 }
             }
         }
@@ -328,7 +328,7 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
      *
      * @param $parameters
      * @return mixed
-     * @throws InvalidYouTubeEmbed
+     * @throws InvalidEmbed
      */
     private function checkCache($parameters) {
         $cache_dir = $GLOBALS["conf"]["cachedir"] . '/plugin_ytembed';
@@ -338,7 +338,7 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
         $file_cache = $cache_dir . '/' . $parameters["playlist_id"] . '.json';
         if(file_exists($file_cache)) {
             if(!$cached_playlist = json_decode(file_get_contents($file_cache), true)) {
-                throw new InvalidYouTubeEmbed('Could not open and/or decode existing cache file for playlist: ' . $parameters["playlist_id"]);
+                throw new InvalidEmbed('Could not open and/or decode existing cache file for playlist: ' . $parameters["playlist_id"]);
             }
             if($cached_playlist['expires'] < time()) { //if the cache has expired:
                 $this->cachePlaylist($parameters, $cache_dir); //generate new cache
@@ -347,7 +347,7 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
             $this->cachePlaylist($parameters, $cache_dir); //cache the new playlist
         }
         if(!$cached_playlist = json_decode(file_get_contents($file_cache))) {
-            throw new InvalidYouTubeEmbed('Could not open and/or decode existing cache file for playlist: ' . $parameters["playlist_id"]);
+            throw new InvalidEmbed('Could not open and/or decode existing cache file for playlist: ' . $parameters["playlist_id"]);
         }
         return $cached_playlist;
     }
@@ -360,7 +360,7 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
      *
      * @param $parameters
      * @param $cache_dir string the directory of the cache to be stored
-     * @throws InvalidYouTubeEmbed
+     * @throws InvalidEmbed
      */
     private function cachePlaylist($parameters, $cache_dir) {
         $video_ids            = array();
@@ -376,11 +376,11 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
 
         if(file_exists($file_cache = $cache_dir . '/' . $parameters["playlist_id"] . '.json')) {
             if(!unlink($file_cache)) {
-                throw new InvalidYouTubeEmbed('Could not delete old cache file for playlist: ' . $parameters["playlist_id"]);
+                throw new InvalidEmbed('Could not delete old cache file for playlist: ' . $parameters["playlist_id"]);
             }
         }
         if(!$newCache = fopen($cache_dir . '/' . $parameters["playlist_id"] . '.json', "w")) {
-            throw new InvalidYouTubeEmbed('Cannot create cache file: cache/' . $parameters['playlist_id'] . '.json');
+            throw new InvalidEmbed('Cannot create cache file: cache/' . $parameters['playlist_id'] . '.json');
         }
         fwrite($newCache, json_encode($video_ids));
         fclose($newCache);
@@ -392,7 +392,7 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
      * @param        $parameters
      * @param string $next_page_token
      * @return mixed
-     * @throws InvalidYouTubeEmbed
+     * @throws InvalidEmbed
      */
     private function sendPlaylistRequest($parameters, $next_page_token = '') {
         $url  = 'https://youtube.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50' . $next_page_token . '&playlistId=' . $parameters["playlist_id"] . '&key=AIzaSyCJFeNmYo-K7tzh9FfHeo8MACrPkJ8zi_Y';
@@ -418,7 +418,7 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
             } else {
                 $message = "Unknown API api_response error";
             }
-            throw new InvalidYouTubeEmbed($message);
+            throw new InvalidEmbed($message);
         }
         curl_close($curl);
         return $api_response;

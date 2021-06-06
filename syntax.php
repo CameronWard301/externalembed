@@ -22,7 +22,7 @@ class InvalidEmbed extends Exception {
     }
 }
 
-class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
+class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
     /**
      * @return string Syntax mode type
      */
@@ -50,11 +50,11 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
      * @param string $mode Parser mode
      */
     public function connectTo($mode) {
-        $this->Lexer->addEntryPattern('{{YT_embed>', $mode, 'plugin_ytembed');
+        $this->Lexer->addEntryPattern('{{external_embed>', $mode, 'plugin_externalembed');
     }
 
     public function postConnect() {
-        $this->Lexer->addExitPattern('}}', 'plugin_ytembed');
+        $this->Lexer->addExitPattern('}}', 'plugin_externalembed');
     }
 
     /**
@@ -82,26 +82,40 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
             case DOKU_LEXER_UNMATCHED :
                 if(!empty($match)) {
                     try {
+                        //get and define config variables
                         define('YT_API_KEY', $this->getConf('YT_API_KEY'));
                         define('PLAYLIST_CACHE_TIME', $this->getConf('PLAYLIST_CACHE_TIME'));
-                        if(empty(YT_API_KEY)) throw new InvalidEmbed('Empty API Key');
-                        if(empty(PLAYLIST_CACHE_TIME)) throw new InvalidEmbed('Empty cache time');
-                        $embed_type = $this->getEmbedType($match);
+                        define('DEFAULT_PRIVACY_DISCLAIMER', $this->getConf('DEFAULT_PRIVACY_DISCLAIMER')); // cam be empty
+                        $disclaimers = array();
+                        define('DOMAIN_WHITELIST', $this->getDomains($this->getConf('DOMAIN_WHITELIST'), $disclaimers));
+                        define('DISCLAIMERS', $disclaimers); //can be empty
+
+                        //validate config variables
+                        if(empty(YT_API_KEY)) throw new InvalidEmbed('Empty API Key, set this in the configuration manager in the admin panel');
+                        if(empty(PLAYLIST_CACHE_TIME)) throw new InvalidEmbed('Empty cache time, set this in the configuration manager in the admin panel');
+                        if(empty(DOMAIN_WHITELIST)) throw new InvalidEmbed('Empty domain whitelist, set this in the configuration manager in the admin panel');
+
+                        $parameters         = $this->getParameters($match);
+                        $embed_type         = $this->getEmbedType($parameters);
+                        $parameters['type'] = $embed_type;
+                        //gets the embed type and checks if the domain is in the whitelist
 
                         switch(true) {
-                            case ($embed_type === "video"):
-                                $parameter_array = $this->parseYouTubeVideoString($match);
-                                $yt_request      = $this->getVideoRequest($parameter_array);
-                                $html            = $this->renderEmbed($yt_request, $parameter_array);
+                            case ($embed_type === "youtube_video"):
+                                $validated_parameters = $this->parseYouTubeVideoString($parameters);
+                                $yt_request           = $this->getVideoRequest($validated_parameters);
+                                $html                 = $this->renderEmbed($yt_request, $validated_parameters);
                                 return array('embed_html' => $html);
-                            case ($embed_type === "playlist"):
-                                $parameter_array             = $this->parseYouTubePlaylistString($match);
-                                $playlist_cache              = $this->checkCache($parameter_array);
-                                $cached_video_id             = $this->getLatestVideo($playlist_cache);
-                                $parameter_array['video_id'] = $cached_video_id;
-                                $yt_request                  = $this->getVideoRequest($parameter_array);
-                                $html                        = $this->renderEmbed($yt_request, $parameter_array);
+                            case ($embed_type === "youtube_playlist"):
+                                $validated_parameters             = $this->parseYouTubePlaylistString($parameters);
+                                $playlist_cache                   = $this->checkCache($validated_parameters);
+                                $cached_video_id                  = $this->getLatestVideo($playlist_cache);
+                                $validated_parameters['video_id'] = $cached_video_id;
+                                $yt_request                       = $this->getVideoRequest($validated_parameters);
+                                $html                             = $this->renderEmbed($yt_request, $validated_parameters);
                                 return array('embed_html' => $html);
+                            //todo: allow fusion embed links
+                            //todo: allow other embeds
                         }
                     } catch(InvalidEmbed $e) {
                         $html = "<p style='color: red; font-weight: bold;'>YouTube Embed Error: " . $e->getMessage() . "</p>";
@@ -136,62 +150,108 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
     }
 
     /**
-     * Method that generates a HTML iframe for youtube embeds
+     * Method that generates a HTML iframe for embedded content
+     * Substitutes default privacy disclaimer if none is found the the disclaimers array
      *
-     * @param $request
-     * @param $parameters
-     * @return string
+     * @param $request    string the source url
+     * @param $parameters array iframe attributes and url data
+     * @return string the html to embed
      */
     private function renderEmbed($request, $parameters): string {
-        return '<div class="external-embed" data-disclaimer=""><iframe style="border: none;" width="' . $parameters["width"] . '" height="' . $parameters["height"] . '" src="' . $request . '"></iframe></div>';
+        $disclaimer = DEFAULT_PRIVACY_DISCLAIMER;
+        if(key_exists($parameters['domain'], DISCLAIMERS)) {
+            if(!empty(DISCLAIMERS[$parameters['domain']])) {
+                $disclaimer = DISCLAIMERS[$parameters['domain']];
+            }
+        }
+        return '<div class="external-embed" data-disclaimer="' . $disclaimer . '"><iframe style="border: none;" width="' . $parameters["width"] . '" height="' . $parameters["height"] . '" src="' . $request . '"></iframe></div>';
     }
 
     /**
-     * Gets the type of embed.
-     * If type is playlist, the embed will show the latest video in the playlist
-     * If the type is video, the embed will only show the video
+     * Check to see if domain in the url is in the domain whitelist.
      *
-     * @param $user_string
-     * @return string //either: 'playlist' or 'video'
+     * Check url to determine the type of embed
+     * If the url is a youtube playlist, the embed will show the latest video in the playlist
+     * If the url is a youtube video, the embed will only show the video
+     * Else the type is 'other' as long as the domain is on the whitelist
+     *
+     * @param $parameters
+     * @return string either: 'playlist' 'YT_video' or 'other'
      * @throws InvalidEmbed
      */
-    private function getEmbedType($user_string): string {
-        $type = substr($user_string, 0, strpos($user_string, " | "));
+    private function getEmbedType(&$parameters): string {
+        if(key_exists('url', $parameters) === false) {
+            throw new InvalidEmbed('Missing url parameter');
+        }
+        $parameters['domain'] = $this->validateDomain($parameters['url']); //validate and return the domain of the url
 
-        if($type == "") throw new InvalidEmbed("Missing Type Parameter / Not Enough Parameters");
+        $embed_type = 'other';
 
-        $decoded_string = explode("type: ", strtolower($type))[1];
-        $embed_type     = str_replace('"', '', $decoded_string);
-
-        if($embed_type == null) throw new InvalidEmbed("Missing Type Parameter");
-
-        $embed_type = strtolower($embed_type);
-
-        $accepted_types = array("playlist", "video");
-
-        if(array_search($embed_type, $accepted_types) === false) {
-            throw new InvalidEmbed(
-                "Invalid Type Parameter: " . htmlspecialchars($embed_type) . "
-            <br>Accepted Types: " . implode(" | ", $accepted_types)
-            );
+        if($parameters['domain'] === 'youtube.com' || $parameters['domain'] === 'youtu.be') {
+            //determine if the url is a video or a playlist
+            if(strpos($parameters['url'], 'playlist?list=') !== false) {
+                return 'youtube_playlist';
+            } else if(strpos($parameters['url'], '/watch') !== false) {
+                return 'youtube_video';
+            } else {
+                throw new InvalidEmbed("Unknown youtube url");
+            }
         }
         return $embed_type;
     }
 
     /**
+     * Method that checks the domain entered by the user against the accepted whitelist of domains set in the configuration manager
+     *
+     * @param $url
+     * @return string The valid domain
+     * @throws InvalidEmbed If the domain is not in the whitelist
+     */
+    private function validateDomain($url): string {
+        $domain = ltrim(parse_url('http://' . str_replace(array('https://', 'http://'), '', $url), PHP_URL_HOST), 'www.');
+
+        if(array_search($domain, DOMAIN_WHITELIST) === false) {
+            throw new InvalidEmbed(
+                "Could not embed content from domain: " . htmlspecialchars($domain) . "
+            <br>Contact your administrator to add it to their whitelist.
+            <br>Accepted Domains: " . implode(" | ", DOMAIN_WHITELIST)
+            );
+        }
+        return $domain;
+    }
+
+    /**
+     * Method for extracting the accepted domains from the config string
+     * Split each data entry by line
+     * Then split each line by commas to extract the disclaimer for each accepted domain.
+     * If there is no disclaimer for a domain, store this as an empty string "" in the disclaimers array
+     *
+     * @param $whitelist_string string string entered from config file
+     * @param $disclaimers      array array that stores the disclaimers for each accepted domain
+     * @return array
+     */
+    private function getDomains($whitelist_string, &$disclaimers): array {
+        $domains = array();
+        $items   = explode("\n", $whitelist_string);
+        foreach($items as $domain_disclaimer) {
+            $data = explode(',', $domain_disclaimer);
+            array_push($domains, trim($data[0]));
+            $disclaimers[trim($data[0])] = trim($data[1]);
+        }
+        return $domains;
+    }
+
+    /**
      * Method that parses the users string query for a video from the wiki editor
      *
-     * @param $user_string
+     * @param $parameters
      * @return array //an array of parameter: value, associations
      * @throws InvalidEmbed
      */
-    private function parseYouTubeVideoString($user_string): array {
+    private function parseYouTubeVideoString($parameters): array {
         $video_parameter_types  = array("type" => true, 'url' => true, 'video_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
         $video_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false']);
         $regex                  = '/^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/';
-
-        $parameters = $this->getParameters($user_string);
-        if(!key_exists('url', $parameters)) throw new InvalidEmbed('Missing url parameter');
 
         if(preg_match($regex, $parameters['url'], $match)) {
             $parameters['video_id'] = $match[5];
@@ -205,20 +265,17 @@ class syntax_plugin_ytembed extends DokuWiki_Syntax_Plugin {
     /**
      * Method that parses the users string query for a playlist from the wiki editor
      *
-     * @param $user_string
+     * @param $parameters
      * @return array //an array of parameter: value, associations
      * @throws InvalidEmbed
      */
-    private function parseYouTubePlaylistString($user_string): array {
+    private function parseYouTubePlaylistString($parameters): array {
         $playlist_parameter_types  = array("type" => true, 'url' => true, 'playlist_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
         $playlist_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false']);
         $regex                     = '/^.*(youtu.be\/|list=)([^#\&\?]*).*/';
 
-        $parameters = $this->getParameters($user_string);
-        if(!key_exists('url', $parameters)) throw new InvalidEmbed('Missing url parameter');
-
         if(preg_match($regex, $parameters['url'], $matches)) {
-            $parameters['playlist_id'] = $matches[2];
+            $parameters['playlist_id'] = $matches[2]; //set the playlist id
         }
         return $this->checkParameters($parameters, $playlist_parameter_types, $playlist_parameter_values);
     }

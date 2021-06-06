@@ -19,22 +19,19 @@ A Dokuwiki plugin to sync data from airtable
 ## Usage:
 
 Use the following syntax on any dokuwiki page.  
-`{{YT_embed>type: "theType" | url: "theURL"}}`
+`{{YT_embed>url: "theURL"}}`
 
 Each parameter: is followed by a space and values enclosed in "". Parameters are separated by ' | ' (note the importance
 of spaces here)
 
 Required Parameters:
 
-* `type: ` - This determines what type of data you are pulling:
-  * `video` - To embed a video
-  * `playlist` -To embed the latest video added to a youtube playlist
 * `url: ` - The YouTube URL associated with the video/playlist
 
 ### Video:
 
 To display a video from YouTube use the following syntax:  
-`{{YT_embed>type: "video" | url: "https://www.youtube.com/watch?v=UKvqC3t-M1g&ab_channel=Wintergatan" | autoplay: "true" | width: "720" | height: "480" | mute: "true" | controls: "false"}}`
+`{{YT_embed>url: "https://www.youtube.com/watch?v=UKvqC3t-M1g&ab_channel=Wintergatan" | autoplay: "true" | width: "720" | height: "480" | mute: "true" | controls: "false"}}`
 
 Optional Parameters:
 
@@ -51,19 +48,19 @@ Optional Parameters:
   * `false`
 #### Example:
 
-`{{YT_embed>type: "video" | url: https://www.youtube.com/watch?v=UKvqC3t-M1g&ab_channel=Wintergatan" | autoplay: "true" | width: "720" | height: "480" | mute: "true" | controls: "false"}}`
+`{{YT_embed>url: https://www.youtube.com/watch?v=UKvqC3t-M1g&ab_channel=Wintergatan" | autoplay: "true" | width: "720" | height: "480" | mute: "true" | controls: "false"}}`
 
 ### The Latest Video From Playlist:
 
 The following syntax is used to get the latest video from a YouTube playlist.
 
-Note that the rendered dokuwiki page is cached, you may want to find a way to auto purge your cache so that your videos stay up to date: https://www.dokuwiki.org/devel:caching
+Note that the rendered dokuwiki page is cached, you may want to find a way to auto purge your cache so that your videos
+stay up to date: https://www.dokuwiki.org/devel:caching
 
-
-The video ID's are stored in a json cache file named <playlistID>.json - these cache files last for the number of hours set in the config file.  
+The video ID's are stored in a json cache file named <playlistID>.json - these cache files last for the number of hours
+set in the config file.  
 This is to prevent and reduce the number of calls needed to the YouTube API (maximum is 10,000 per day)  
-`{{YT_embed>type: "playlist" | url: "PLAYLIST_URL"}}`  
-
+`{{YT_embed>url: "PLAYLIST_URL"}}`
 
 Optional Parameters:
 
@@ -71,4 +68,4 @@ The same optional parameters used for the video type can also be used when using
 
 #### Example:
 
-`{{YT_embed>type: "playlist" | url: "https://www.youtube.com/playlist?list=PLLLYkE3G1HED6rW-bkliHbMroHYFf4ukv" | autoplay: "true" | width: "720" | height: "480" | mute: "true"}}`
+`{{YT_embed>url: "https://www.youtube.com/playlist?list=PLLLYkE3G1HED6rW-bkliHbMroHYFf4ukv" | autoplay: "true" | width: "720" | height: "480" | mute: "true"}}`

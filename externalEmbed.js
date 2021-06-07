@@ -9,17 +9,22 @@ function openDisclaimer(element) {
         case "youtube_playlist":
         case "youtube_video":
         default:
-            let jsonData = JSON.parse(this.attributes.getNamedItem("data-json").value);
+            let jsonData = JSON.parse(element.attributes.getNamedItem("data-json").value);
             let openButton = '<button onclick="this.parentElement.outerHTML = renderIframe(this)">Open Embed</button>';
             element.innerHTML = jsonData.disclaimer + openButton;
+            element.style.width = jsonData.width;
+            element.style.height = jsonData.height;
             break;
     }
 }
 
 function renderIframe(button) {
-    let jsonData = JSON.parse(this.parentElement.attributes.getNamedItem("data-json").value);
+    let jsonData = JSON.parse(button.parentElement.attributes.getNamedItem("data-json").value);
     return '<iframe style="border: none;" '
         + 'width="' + jsonData.width
         + '" height="' + jsonData.height
-        + '" src="' + jsonData.request + '"></iframe>';
+        + '" src="' + jsonData.request
+        + '" muted="' + jsonData.muted
+        + '" autoplay="' + jsonData.autoplay
+        + '"></iframe>';
 }

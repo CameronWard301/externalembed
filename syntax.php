@@ -160,6 +160,8 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
     private function renderJSON($request, $parameters): string {
         $parameters['disclaimer'] = DEFAULT_PRIVACY_DISCLAIMER;
         $parameters['request'] = $request;
+        unset($parameters['url']);
+
         if(key_exists($parameters['domain'], DISCLAIMERS)) {
             if(!empty(DISCLAIMERS[$parameters['domain']])) {
                 $parameters['disclaimer'] = DISCLAIMERS[$parameters['domain']];

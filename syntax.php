@@ -183,7 +183,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             }
         }
         $dataJSON = json_encode(array_map("utf8_encode", $parameters));
-        return '<div class="embed embedType-' . htmlspecialchars($type) . '" data-json=\'' . $dataJSON . '\'></div>';
+        return '<div class="externalembed_embed embedType-' . htmlspecialchars($type) . '" data-json=\'' . $dataJSON . '\'></div>';
     }
 
     /**

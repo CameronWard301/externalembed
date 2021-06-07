@@ -169,20 +169,12 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
         $parameters['request']    = $request;
 
         //remove unnecessary parameters that don't need to be sent
-        unset($parameters['url']);
-        unset($parameters['type']);
-        if($parameters['muted'] === false) {
-            unset($parameters['muted']);
-        }
-        if($parameters['autoplay'] === false) {
-            unset($parameters['autoplay']);
-        }
-        if($parameters['controls'] === false) {
-            unset($parameters['controls']);
-        }
-        if($parameters['youtube_thumbnail'] === false) {
-            unset($parameters['controls']);
-        }
+        unset($parameters['url'],
+            $parameters['type'],
+            $parameters['autoplay'],
+            $parameters['loop'],
+            $parameters['mute'],
+            $parameters['controls']);
 
         if(key_exists($parameters['domain'], DISCLAIMERS)) { //if there is a unique disclaimer for the domain, replace the default value with custom value
             if(!empty(DISCLAIMERS[$parameters['domain']])) {

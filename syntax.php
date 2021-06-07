@@ -104,7 +104,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                             case ($embed_type === "youtube_video"):
                                 $validated_parameters = $this->parseYouTubeVideoString($parameters);
                                 $yt_request           = $this->getVideoRequest($validated_parameters);
-                                $html                 = $this->renderEmbed($yt_request, $validated_parameters);
+                                $html                 = $this->renderJSON($yt_request, $validated_parameters);
                                 return array('embed_html' => $html);
                             case ($embed_type === "youtube_playlist"):
                                 $validated_parameters             = $this->parseYouTubePlaylistString($parameters);
@@ -112,7 +112,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                                 $cached_video_id                  = $this->getLatestVideo($playlist_cache);
                                 $validated_parameters['video_id'] = $cached_video_id;
                                 $yt_request                       = $this->getVideoRequest($validated_parameters);
-                                $html                             = $this->renderEmbed($yt_request, $validated_parameters);
+                                $html                             = $this->renderJSON($yt_request, $validated_parameters);
                                 return array('embed_html' => $html);
                             //todo: allow fusion embed links
                             //todo: allow other embeds
@@ -157,15 +157,16 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @param $parameters array iframe attributes and url data
      * @return string the html to embed
      */
-    private function renderEmbed($request, $parameters): string {
-        $disclaimer = DEFAULT_PRIVACY_DISCLAIMER;
-        $iframe = '<iframe style="border: none;" width="' . $parameters["width"] . '" height="' . $parameters["height"] . '" src="' . $request . '"></iframe>\'>';
+    private function renderJSON($request, $parameters): string {
+        $parameters['disclaimer'] = DEFAULT_PRIVACY_DISCLAIMER;
+        $parameters['request'] = $request;
         if(key_exists($parameters['domain'], DISCLAIMERS)) {
             if(!empty(DISCLAIMERS[$parameters['domain']])) {
-                $disclaimer = DISCLAIMERS[$parameters['domain']];
+                $parameters['disclaimer'] = DISCLAIMERS[$parameters['domain']];
             }
         }
-        return '<div class="embed embedType-' . $parameters['type'] . '" data-disclaimer=\'' . $disclaimer . '\' data-html=\'' . $iframe . '\'></div>';
+        $dataJSON = json_encode(array_map("utf8_encode", $parameters));
+        return '<div class="embed embedType-' . $parameters['type'] . '" data-json=\''. $dataJSON . '\'></div>';
     }
 
     /**

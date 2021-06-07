@@ -1,6 +1,6 @@
 <?php /** @noinspection DuplicatedCode */
 /**
- * DokuWiki Plugin ytembed (Syntax Component)
+ * DokuWiki Plugin externalembed (Syntax Component)
  *
  * @license GPL 2 http://www.gnu.org/licenses/gpl-2.0.html
  * @author  Cameron <cameronward007@gmail.com>
@@ -58,7 +58,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
     }
 
     /**
-     * Handle matches of the ytembed syntax
+     * Handle matches of the externalembed syntax
      *
      * @param string       $match   The match of the syntax
      * @param int          $state   The state of the handler
@@ -84,15 +84,21 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                     try {
                         //get and define config variables
                         define('YT_API_KEY', $this->getConf('YT_API_KEY'));
+                        define('THUMBNAIL_CACHE_TIME', $this->getConf('THUMBNAIL_CACHE_TIME'));
                         define('PLAYLIST_CACHE_TIME', $this->getConf('PLAYLIST_CACHE_TIME'));
                         define('DEFAULT_PRIVACY_DISCLAIMER', $this->getConf('DEFAULT_PRIVACY_DISCLAIMER')); // cam be empty
                         $disclaimers = array();
                         define('DOMAIN_WHITELIST', $this->getDomains($this->getConf('DOMAIN_WHITELIST'), $disclaimers));
                         define('DISCLAIMERS', $disclaimers); //can be empty
+                        define('CACHE_DIR', $GLOBALS["conf"]["cachedir"] . '/plugin_externalembed');
+                        if(!file_exists(CACHE_DIR)) {
+                            mkdir(CACHE_DIR, 0777, true);
+                        }
 
                         //validate config variables
                         if(empty(YT_API_KEY)) throw new InvalidEmbed('Empty API Key, set this in the configuration manager in the admin panel');
-                        if(empty(PLAYLIST_CACHE_TIME)) throw new InvalidEmbed('Empty cache time, set this in the configuration manager in the admin panel');
+                        if(empty(THUMBNAIL_CACHE_TIME)) throw new InvalidEmbed('Empty cache time for thumbnails, set this in the configuration manager in the admin panel');
+                        if(empty(PLAYLIST_CACHE_TIME)) throw new InvalidEmbed('Empty cache time for playlists, set this in the configuration manager in the admin panel');
                         if(empty(DOMAIN_WHITELIST)) throw new InvalidEmbed('Empty domain whitelist, set this in the configuration manager in the admin panel');
 
                         $parameters         = $this->getParameters($match);
@@ -102,13 +108,14 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
 
                         switch(true) {
                             case ($embed_type === "youtube_video"):
-                                $validated_parameters = $this->parseYouTubeVideoString($parameters);
-                                $yt_request           = $this->getVideoRequest($validated_parameters);
-                                $html                 = $this->renderJSON($yt_request, $validated_parameters);
+                                $validated_parameters                      = $this->parseYouTubeVideoString($parameters);
+                                $yt_request                                = $this->getVideoRequest($validated_parameters);
+                                $validated_parameters['youtube_thumbnail'] = $this->checkThumbnailCache($validated_parameters);
+                                $html                                      = $this->renderJSON($yt_request, $validated_parameters);
                                 return array('embed_html' => $html);
                             case ($embed_type === "youtube_playlist"):
                                 $validated_parameters             = $this->parseYouTubePlaylistString($parameters);
-                                $playlist_cache                   = $this->checkCache($validated_parameters);
+                                $playlist_cache                   = $this->checkPlaylistCache($validated_parameters);
                                 $cached_video_id                  = $this->getLatestVideo($playlist_cache);
                                 $validated_parameters['video_id'] = $cached_video_id;
                                 $yt_request                       = $this->getVideoRequest($validated_parameters);
@@ -159,20 +166,31 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      */
     private function renderJSON($request, $parameters): string {
         $parameters['disclaimer'] = DEFAULT_PRIVACY_DISCLAIMER;
-        $parameters['request'] = $request;
+        $parameters['request']    = $request;
+
+        //remove unnecessary parameters that don't need to be sent
         unset($parameters['url']);
         unset($parameters['type']);
-        if ($parameters['muted'] === false) {unset($parameters['muted']);}
-        if ($parameters['autoplay'] === false) {unset($parameters['autoplay']);}
-        if ($parameters['controls'] === false) {unset($parameters['controls']);}
+        if($parameters['muted'] === false) {
+            unset($parameters['muted']);
+        }
+        if($parameters['autoplay'] === false) {
+            unset($parameters['autoplay']);
+        }
+        if($parameters['controls'] === false) {
+            unset($parameters['controls']);
+        }
+        if($parameters['youtube_thumbnail'] === false) {
+            unset($parameters['controls']);
+        }
 
-        if(key_exists($parameters['domain'], DISCLAIMERS)) {
+        if(key_exists($parameters['domain'], DISCLAIMERS)) { //if there is a unique disclaimer for the domain, replace the default value with custom value
             if(!empty(DISCLAIMERS[$parameters['domain']])) {
                 $parameters['disclaimer'] = DISCLAIMERS[$parameters['domain']];
             }
         }
         $dataJSON = json_encode(array_map("utf8_encode", $parameters));
-        return '<div class="embed embedType-' . $parameters['type'] . '" data-json=\''. $dataJSON . '\'></div>';
+        return '<div class="embed embedType-' . htmlspecialchars($parameters['type']) . '" data-json=\'' . $dataJSON . '\'></div>';
     }
 
     /**
@@ -387,6 +405,57 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
     }
 
     /**
+     * Method for getting youtube thumbnail and storing it as a base64 string in a cache file
+     *
+     * @param $parameters
+     * @throws InvalidEmbed
+     */
+    private function cacheYouTubeThumbnail($parameters) {
+        $img_url              = 'https://img.youtube.com/vi/' . $parameters['video_id'] . '/hqdefault.jpg';
+        $thumbnail['expires'] = time() + (THUMBNAIL_CACHE_TIME * 60 * 60); //set cache to expire in seconds
+        $thumbnail['data']    = base64_encode(file_get_contents($img_url));
+
+        if(file_exists($file_cache = CACHE_DIR . '/' . $parameters["video_id"] . '.json')) {
+            if(!unlink($file_cache)) {
+                throw new InvalidEmbed('Could not delete old thumbnail cache file for video: ' . $parameters["video_id"]);
+            }
+        }
+        if(!$newCache = fopen(CACHE_DIR . '/' . $parameters["video_id"] . '.json', "w")) {
+            throw new InvalidEmbed('Cannot create cache file: cache/' . $parameters['video_id'] . '.json');
+        }
+        fwrite($newCache, json_encode($thumbnail));
+        fclose($newCache);
+    }
+
+    /**
+     * Method for checking the cache for an individual video
+     *
+     * If the cache exists and is expired or the cache doesnt exist: fetch data from YouTube and store in a JSON file
+     * Otherwise open and return the valid cache array
+     *
+     * @param $parameters
+     * @return mixed
+     * @throws InvalidEmbed
+     */
+    private function checkThumbnailCache($parameters) {
+        $file_cache = CACHE_DIR . '/' . $parameters['video_id'] . '.json';
+        if(file_exists($file_cache)) {
+            if(!$cached_thumbnail = json_decode(file_get_contents($file_cache), true)) { //open and decode existing cache file
+                throw new InvalidEmbed('Could not open and/or decode existing thumbnail cache file for video: ' . $parameters["video_id"]);
+            }
+            if($cached_thumbnail['expires'] < time()) {
+                $this->cacheYouTubeThumbnail($parameters);
+            }
+        } else {
+            $this->cacheYouTubeThumbnail($parameters);
+        }
+        if(!$cached_thumbnail_file = json_decode(file_get_contents($file_cache), true)) { //open and decode existing cache file
+            throw new InvalidEmbed('Could not open and/or decode existing thumbnail cache file for video: ' . $parameters["video_id"]);
+        }
+        return $cached_thumbnail_file['data'];
+    }
+
+    /**
      * Method for checking the cache for a given playlist
      * If the cache exists and is expired or the cache doesnt exist: fetch data from YouTube and store in a JSON file
      * Otherwise open and return the valid cache array
@@ -395,21 +464,17 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @return mixed
      * @throws InvalidEmbed
      */
-    private function checkCache($parameters) {
-        $cache_dir = $GLOBALS["conf"]["cachedir"] . '/plugin_ytembed';
-        if(!file_exists($cache_dir)) {
-            mkdir($cache_dir, 0777, true);
-        }
-        $file_cache = $cache_dir . '/' . $parameters["playlist_id"] . '.json';
+    private function checkPlaylistCache($parameters) {
+        $file_cache = CACHE_DIR . '/' . $parameters["playlist_id"] . '.json';
         if(file_exists($file_cache)) {
             if(!$cached_playlist = json_decode(file_get_contents($file_cache), true)) {
                 throw new InvalidEmbed('Could not open and/or decode existing cache file for playlist: ' . $parameters["playlist_id"]);
             }
             if($cached_playlist['expires'] < time()) { //if the cache has expired:
-                $this->cachePlaylist($parameters, $cache_dir); //generate new cache
+                $this->cachePlaylist($parameters); //generate new cache
             }
         } else { //if file does not exist:
-            $this->cachePlaylist($parameters, $cache_dir); //cache the new playlist
+            $this->cachePlaylist($parameters); //cache the new playlist
         }
         if(!$cached_playlist = json_decode(file_get_contents($file_cache))) {
             throw new InvalidEmbed('Could not open and/or decode existing cache file for playlist: ' . $parameters["playlist_id"]);
@@ -424,10 +489,9 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * Pre-conditions: Cache is expired or does not exist
      *
      * @param $parameters
-     * @param $cache_dir string the directory of the cache to be stored
      * @throws InvalidEmbed
      */
-    private function cachePlaylist($parameters, $cache_dir) {
+    private function cachePlaylist($parameters) {
         $video_ids            = array();
         $response             = array();
         $video_ids['expires'] = time() + (PLAYLIST_CACHE_TIME * 60 * 60); //set cache to expire in seconds
@@ -439,12 +503,12 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             }
         }
 
-        if(file_exists($file_cache = $cache_dir . '/' . $parameters["playlist_id"] . '.json')) {
+        if(file_exists($file_cache = CACHE_DIR . '/' . $parameters["playlist_id"] . '.json')) {
             if(!unlink($file_cache)) {
                 throw new InvalidEmbed('Could not delete old cache file for playlist: ' . $parameters["playlist_id"]);
             }
         }
-        if(!$newCache = fopen($cache_dir . '/' . $parameters["playlist_id"] . '.json', "w")) {
+        if(!$newCache = fopen(CACHE_DIR . '/' . $parameters["playlist_id"] . '.json', "w")) {
             throw new InvalidEmbed('Cannot create cache file: cache/' . $parameters['playlist_id'] . '.json');
         }
         fwrite($newCache, json_encode($video_ids));

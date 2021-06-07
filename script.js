@@ -26,5 +26,6 @@ function renderIframe(button) {
         + '" src="' + jsonData.request
         + '" muted="' + jsonData.muted
         + '" autoplay="' + jsonData.autoplay
+        + '" controls="' + jsonData.controls
         + '"></iframe>';
 }

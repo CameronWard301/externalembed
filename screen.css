@@ -1,17 +1,31 @@
-.embed {
+
+.externalembed_embed {
     background-color: #0002;
     margin: 20px;
     text-align: center;
     overflow: hidden;
 }
-.embed > p {
-    text-align: center;
-    max-width: 250px;
-    margin: 15px auto auto auto;
 
+.externalembed_disclaimer {
+    color: white;
+    position: relative;
+    bottom: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+    max-width: 300px;
+    background-color: #0009;
+    border-radius: 10px;
+    padding: 10px;
 }
-.embed > button {
+
+.externalembed_disclaimer > button {
     margin: 10px;
     border: 1px solid gray;
+    border-radius: 5px;
 
+}
+
+.externalembed_embed > img {
+    -webkit-filter: blur(2.5px) brightness(50%);
 }

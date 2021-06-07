@@ -167,6 +167,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
     private function renderJSON($request, $parameters): string {
         $parameters['disclaimer'] = DEFAULT_PRIVACY_DISCLAIMER;
         $parameters['request']    = $request;
+        $type = $parameters['type'];
 
         //remove unnecessary parameters that don't need to be sent
         unset($parameters['url'],
@@ -182,7 +183,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             }
         }
         $dataJSON = json_encode(array_map("utf8_encode", $parameters));
-        return '<div class="embed embedType-' . htmlspecialchars($parameters['type']) . '" data-json=\'' . $dataJSON . '\'></div>';
+        return '<div class="embed embedType-' . htmlspecialchars($type) . '" data-json=\'' . $dataJSON . '\'></div>';
     }
 
     /**

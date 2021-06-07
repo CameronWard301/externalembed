@@ -118,7 +118,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                             //todo: allow other embeds
                         }
                     } catch(InvalidEmbed $e) {
-                        $html = "<p style='color: red; font-weight: bold;'>YouTube Embed Error: " . $e->getMessage() . "</p>";
+                        $html = "<p style='color: red; font-weight: bold;'>External Embed Error: " . $e->getMessage() . "</p>";
                         return array('embed_html' => $html);
                     }
                 }
@@ -159,12 +159,13 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      */
     private function renderEmbed($request, $parameters): string {
         $disclaimer = DEFAULT_PRIVACY_DISCLAIMER;
+        $iframe = '<iframe style="border: none;" width="' . $parameters["width"] . '" height="' . $parameters["height"] . '" src="' . $request . '"></iframe>\'>';
         if(key_exists($parameters['domain'], DISCLAIMERS)) {
             if(!empty(DISCLAIMERS[$parameters['domain']])) {
                 $disclaimer = DISCLAIMERS[$parameters['domain']];
             }
         }
-        return '<div class="external-embed" data-disclaimer="' . $disclaimer . '"><iframe style="border: none;" width="' . $parameters["width"] . '" height="' . $parameters["height"] . '" src="' . $request . '"></iframe></div>';
+        return '<div class="embed embedType-' . $parameters['type'] . '" data-disclaimer=\'' . $disclaimer . '\' data-html=\'' . $iframe . '\'></div>';
     }
 
     /**

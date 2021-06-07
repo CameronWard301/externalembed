@@ -21,11 +21,11 @@ function openDisclaimer(element) {
 function renderIframe(button) {
     let jsonData = JSON.parse(button.parentElement.attributes.getNamedItem("data-json").value);
     return '<iframe style="border: none;" '
-        + 'width="' + jsonData.width
-        + '" height="' + jsonData.height
+        + 'width="' + jsonData.width == null ? 200 : jsonData.width
+        + '" height="' + jsonData.height == null ? 600 : jsonData.height
         + '" src="' + jsonData.request
-        + '" muted="' + jsonData.muted
-        + '" autoplay="' + jsonData.autoplay
-        + '" controls="' + jsonData.controls
+        + '" muted="' + jsonData.muted == null ? false : jsonData.muted
+        + '" autoplay="' + jsonData.autoplay == null ? false : jsonData.autoplay
+        + '" controls="' + jsonData.controls == null ? false : jsonData.controls
         + '"></iframe>';
 }

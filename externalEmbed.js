@@ -10,13 +10,14 @@ function openDisclaimer(element) {
         case "youtube_video":
         default:
             let jsonData = JSON.parse(this.attributes.getNamedItem("data-json").value);
-            let openButton = '<button onclick="this.parentElement.outerHTML = this.parentElement.attributes.getNamedItem(\'data-html\').value">Open Embed</button>';
+            let openButton = '<button onclick="this.parentElement.outerHTML = renderIframe(this)">Open Embed</button>';
             element.innerHTML = jsonData.disclaimer + openButton;
             break;
     }
 }
 
-function renderIframe(jsonData){
+function renderIframe(button) {
+    let jsonData = JSON.parse(this.parentElement.attributes.getNamedItem("data-json").value);
     return '<iframe style="border: none;" '
         + 'width="' + jsonData.width
         + '" height="' + jsonData.height

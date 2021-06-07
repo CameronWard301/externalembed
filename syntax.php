@@ -114,12 +114,13 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                                 $html                                      = $this->renderJSON($yt_request, $validated_parameters);
                                 return array('embed_html' => $html);
                             case ($embed_type === "youtube_playlist"):
-                                $validated_parameters             = $this->parseYouTubePlaylistString($parameters);
-                                $playlist_cache                   = $this->checkPlaylistCache($validated_parameters);
-                                $cached_video_id                  = $this->getLatestVideo($playlist_cache);
-                                $validated_parameters['video_id'] = $cached_video_id;
-                                $yt_request                       = $this->getVideoRequest($validated_parameters);
-                                $html                             = $this->renderJSON($yt_request, $validated_parameters);
+                                $validated_parameters                      = $this->parseYouTubePlaylistString($parameters);
+                                $playlist_cache                            = $this->checkPlaylistCache($validated_parameters);
+                                $cached_video_id                           = $this->getLatestVideo($playlist_cache);
+                                $validated_parameters['video_id']          = $cached_video_id;
+                                $validated_parameters['youtube_thumbnail'] = $this->checkThumbnailCache($validated_parameters);
+                                $yt_request                                = $this->getVideoRequest($validated_parameters);
+                                $html                                      = $this->renderJSON($yt_request, $validated_parameters);
                                 return array('embed_html' => $html);
                             //todo: allow fusion embed links
                             //todo: allow other embeds
@@ -167,15 +168,17 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
     private function renderJSON($request, $parameters): string {
         $parameters['disclaimer'] = DEFAULT_PRIVACY_DISCLAIMER;
         $parameters['request']    = $request;
-        $type = $parameters['type'];
+        $type                     = $parameters['type'];
 
         //remove unnecessary parameters that don't need to be sent
-        unset($parameters['url'],
+        unset(
+            $parameters['url'],
             $parameters['type'],
             $parameters['autoplay'],
             $parameters['loop'],
             $parameters['mute'],
-            $parameters['controls']);
+            $parameters['controls']
+        );
 
         if(key_exists($parameters['domain'], DISCLAIMERS)) { //if there is a unique disclaimer for the domain, replace the default value with custom value
             if(!empty(DISCLAIMERS[$parameters['domain']])) {

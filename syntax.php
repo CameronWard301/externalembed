@@ -91,6 +91,8 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                         define('DOMAIN_WHITELIST', $this->getDomains($this->getConf('DOMAIN_WHITELIST'), $disclaimers));
                         define('DISCLAIMERS', $disclaimers); //can be empty
                         define('CACHE_DIR', $GLOBALS["conf"]["cachedir"] . '/plugin_externalembed');
+                        define('MINIMUM_EMBED_WIDTH', $this->getConf('MINIMUM_EMBED_WIDTH'));
+                        define('MINIMUM_EMBED_HEIGHT', $this->getConf('MINIMUM_EMBED_WIDTH'));
                         if(!file_exists(CACHE_DIR)) {
                             mkdir(CACHE_DIR, 0777, true);
                         }
@@ -122,8 +124,19 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                                 $yt_request                                = $this->getVideoRequest($validated_parameters);
                                 $html                                      = $this->renderJSON($yt_request, $validated_parameters);
                                 return array('embed_html' => $html);
+                            case ($embed_type === 'fusion'):
+                                $validated_parameters = $this->parseFusionString($parameters);
+                                $fusion_request       = $this->getFusionRequest($validated_parameters);
+                                $html                 = $this->renderJSON($fusion_request, $validated_parameters);
+                                return array('embed_html' => $html);
+                            case ($embed_type === 'other'):
+                                $validated_parameters = $this->parseOtherEmbedString($parameters);
+                                $html                 = $this->renderJSON($validated_parameters['url'], $validated_parameters);
+                                return array('embed_html' => $html);
+                            default:
+                                throw new InvalidEmbed("Unknown Embed Type");
+
                             //todo: allow fusion embed links
-                            //todo: allow other embeds
                         }
                     } catch(InvalidEmbed $e) {
                         $html = "<p style='color: red; font-weight: bold;'>External Embed Error: " . $e->getMessage() . "</p>";
@@ -219,6 +232,10 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                 throw new InvalidEmbed("Unknown youtube url");
             }
         }
+        if($parameters['domain'] === 'inventopia.autodesk360.com') {
+            return 'fusion';
+        }
+
         return $embed_type;
     }
 
@@ -271,7 +288,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @throws InvalidEmbed
      */
     private function parseYouTubeVideoString($parameters): array {
-        $video_parameter_types  = array("type" => true, 'url' => true, 'video_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
+        $video_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'video_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
         $video_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false']);
         $regex                  = '/^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/';
 
@@ -292,7 +309,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @throws InvalidEmbed
      */
     private function parseYouTubePlaylistString($parameters): array {
-        $playlist_parameter_types  = array("type" => true, 'url' => true, 'playlist_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
+        $playlist_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'playlist_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
         $playlist_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false']);
         $regex                     = '/^.*(youtu.be\/|list=)([^#\&\?]*).*/';
 
@@ -300,6 +317,34 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             $parameters['playlist_id'] = $matches[2]; //set the playlist id
         }
         return $this->checkParameters($parameters, $playlist_parameter_types, $playlist_parameter_values);
+    }
+
+    /**
+     * Method that parses the users string query for a fusion embed
+     *
+     * @param $parameters
+     * @return array an array of validated parameters
+     * @throws InvalidEmbed
+     */
+    private function parseFusionString($parameters): array {
+        $fusion_parameter_types  = array('type' => true, 'url' => true, 'domain' => true, 'width' => '1280', 'height' => '720', 'allowFullScreen' => 'true');
+        $fusion_parameter_values = array('allowFullScreen' => ['true', 'false']);
+
+        return $this->checkParameters($parameters, $fusion_parameter_types, $fusion_parameter_values);
+    }
+
+    /**
+     * Method that parses the users string query for an embed type classed as "other"
+     *
+     * @param $parameters
+     * @return array an array of validated parameters
+     * @throws InvalidEmbed
+     */
+    private function parseOtherEmbedString($parameters): array {
+        $other_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'width' => '1280', 'height' => '720');
+        $other_parameter_values = array();
+
+        return $this->checkParameters($parameters, $other_parameter_types, $other_parameter_values);
     }
 
     /**
@@ -342,9 +387,11 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                 }
                 $query_array[$key] = $value; // substitute default
             }
+
             if(($query_array[$key] == null || $query_array[$key] === "") && $value === true) { //if parameter is required but value is not present
                 throw new InvalidEmbed("Missing Parameter Value for: '" . $key . "'.");
             }
+
             if(array_key_exists($key, $parameter_values)) { //check accepted parameter_values array
                 if(!in_array($query_array[$key], $parameter_values[$key])) { //if parameter value is not accepted:
                     $message = "Invalid Parameter Value: '" . htmlspecialchars($query_array[$key]) . "' for Key: '" . $key . "'.
@@ -356,6 +403,15 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                 }
             }
         }
+        if(intval($query_array['width']) < MINIMUM_EMBED_WIDTH) $query_array['width'] = MINIMUM_EMBED_WIDTH;
+        if(intval($query_array['height']) < MINIMUM_EMBED_WIDTH) $query_array['height'] = MINIMUM_EMBED_HEIGHT;
+
+        foreach($query_array as $key => $value) {
+            if(!array_key_exists($key, $required_parameters)) {
+                throw new InvalidEmbed("Invalid parameter: " . htmlspecialchars($key) . '. For url: ' . htmlspecialchars($query_array['url']));
+            }
+        }
+
         return $query_array;
     }
 
@@ -390,6 +446,22 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             $controls = '0';
         }
         return 'https://www.youtube.com/embed/' . $parameters['video_id'] . '?' . 'autoplay=' . $autoplay . '&mute=' . $mute . '&loop=' . $loop . '&controls=' . $controls;
+    }
+
+    /**
+     * Method that turns a normal fusion url into an embed url
+     * Also sets the required iframe parameters for enabling fullscreen
+     * @param $parameters
+     * @return string
+     */
+    private function getFusionRequest(&$parameters): string {
+        if($parameters['allowFullScreen'] === 'true') {
+            $parameters['allowfullscreen']       = 'true';
+            $parameters['webkitallowfullscreen'] = 'true';
+            $parameters['mozallowfullscreen']    = 'true';
+        }
+        unset($parameters['allowFullScreen']);
+        return $parameters['url'] . '?mode=embed';
     }
 
     /**

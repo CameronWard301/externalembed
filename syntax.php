@@ -110,7 +110,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                             case ($embed_type === "youtube_video"):
                                 $validated_parameters                      = $this->parseYouTubeVideoString($parameters);
                                 $yt_request                                = $this->getVideoRequest($validated_parameters);
-                                $validated_parameters['youtube_thumbnail'] = $this->checkThumbnailCache($validated_parameters);
+                                $validated_parameters['thumbnail'] = $this->checkThumbnailCache($validated_parameters);
                                 $html                                      = $this->renderJSON($yt_request, $validated_parameters);
                                 return array('embed_html' => $html);
                             case ($embed_type === "youtube_playlist"):
@@ -118,7 +118,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                                 $playlist_cache                            = $this->checkPlaylistCache($validated_parameters);
                                 $cached_video_id                           = $this->getLatestVideo($playlist_cache);
                                 $validated_parameters['video_id']          = $cached_video_id;
-                                $validated_parameters['youtube_thumbnail'] = $this->checkThumbnailCache($validated_parameters);
+                                $validated_parameters['thumbnail'] = $this->checkThumbnailCache($validated_parameters);
                                 $yt_request                                = $this->getVideoRequest($validated_parameters);
                                 $html                                      = $this->renderJSON($yt_request, $validated_parameters);
                                 return array('embed_html' => $html);
@@ -186,7 +186,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             }
         }
         $dataJSON = json_encode(array_map("utf8_encode", $parameters));
-        return '<div class="externalembed_embed embedType-' . htmlspecialchars($type) . '" data-json=\'' . $dataJSON . '\'></div>';
+        return '<div class="externalembed_embed externalembed_embedType-' . htmlspecialchars($type) . '" data-json=\'' . $dataJSON . '\'></div>';
     }
 
     /**

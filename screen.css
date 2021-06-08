@@ -14,20 +14,20 @@
     transform: translate(-50%, -50%);
     text-align: center;
     max-width: 300px;
-    background-color: #0009;
+    background-color: rgba(33, 33, 33, 0.6);
     border-radius: 10px;
     padding: 10px;
 }
 
 .externalembed_disclaimer > button {
     margin: 10px;
-    border: 1px solid gray;
+    border: gray;
     border-radius: 5px;
 
 }
 
 .externalembed_embed > img {
-    -webkit-filter: blur(2.5px) brightness(50%);
+    -webkit-filter: blur(3px) brightness(50%);
 }
 
 .externalembed_tosRejected {
@@ -40,4 +40,28 @@
     transform: unset;
     text-align: left;
     max-width: 100%;
+}
+
+.externalembed_accept {
+    color: #FFF;
+    background: #44CC44;
+    padding: 8px 20px;
+    box-shadow: 0 4px 0 0 #2EA62E;
+}
+
+.externalembed_accept:hover {
+    background: #6FE76F;
+    box-shadow: 0 4px 0 0 #7ED37E;
+}
+
+.externalembed_reject {
+    color: #FFF;
+    background: #f84e2e;
+    padding: 8px 20px;
+    box-shadow: 0 4px 0 0 #CB4949;
+}
+
+.externalembed_reject:hover {
+    background: rgb(255, 147, 128);
+    box-shadow: 0 4px 0 0 #EF8282;
 }

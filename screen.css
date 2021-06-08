@@ -29,3 +29,15 @@
 .externalembed_embed > img {
     -webkit-filter: blur(2.5px) brightness(50%);
 }
+
+.externalembed_tosRejected {
+    max-width: 300px;
+    background-color: #0000;
+}
+
+.externalembed_tosRejected > .externalembed_disclaimer {
+    position: static;
+    transform: unset;
+    text-align: left;
+    max-width: 100%;
+}

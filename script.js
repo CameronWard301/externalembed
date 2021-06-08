@@ -9,6 +9,7 @@ function openDisclaimer(element) {
     let jsonData = JSON.parse(element.attributes.getNamedItem("data-json").value);
     let openButton = '<button onclick="renderIframe(this);">Open Embed</button>';
     if (localStorage.getItem("externalembed_tosaccepted") == "true") {
+        element.classList.remove("externalembed_tosRejected");
         //----------Modular----------
         switch ([...element.classList].find(str => str.startsWith("externalembed_embedType-")).substr("externalembed_embedType-".length)) {
             case "youtube_playlist":
@@ -23,12 +24,17 @@ function openDisclaimer(element) {
         }
         //----------End Modular----------
     } else {
-        let tosMessage = "<p>tos accept question here. dont forget the buttons!</p><button onclick=\'localStorage.setItem(\"externalembed_tosaccepted\", \"true\");openDisclaimerAll()\'>Accept</button><button onclick=\'localStorage.setItem(\"externalembed_tosaccepted\", \"false\");openDisclaimerAll()\'>Denail tos</button>";
         if (localStorage.getItem("externalembed_tosaccepted") == "false"){
-            tosMessage = "<p>tos denailed message here. dont forget the buttons!</p><button onclick=\'localStorage.setItem(\"externalembed_tosaccepted\", \"true\");openDisclaimerAll()\'>Re-Accept</button>";
+            let tosMessage = "<p>tos denailed message here. dont forget the buttons!</p><button onclick=\'localStorage.setItem(\"externalembed_tosaccepted\", \"true\");openDisclaimerAll()\'>Re-Accept</button>";
+            element.innerHTML = "<div class='externalembed_disclaimer'>" + tosMessage + "</div>";
+            element.classList.add("externalembed_tosRejected");
+            element.style.width = "";
+            element.style.height = "";
+        } else {
+            let tosMessage = "<p>tos accept question here. dont forget the buttons!</p><button onclick=\'localStorage.setItem(\"externalembed_tosaccepted\", \"true\");openDisclaimerAll()\'>Accept</button><button onclick=\'localStorage.setItem(\"externalembed_tosaccepted\", \"false\");openDisclaimerAll()\'>Denail tos</button>";
+            element.innerHTML = generateThumbnail(jsonData) + "<div class='externalembed_disclaimer'>" + tosMessage + "</div>";
+            setSize(jsonData.width, jsonData.height, element);
         }
-        element.innerHTML = generateThumbnail(jsonData) + "<div class='externalembed_disclaimer'>" + tosMessage + "</div>";
-        setSize(jsonData.width, jsonData.height, element);
     }
 }
 

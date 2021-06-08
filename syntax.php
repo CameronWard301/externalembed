@@ -407,7 +407,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @throws InvalidEmbed
      */
     private function cacheYouTubeThumbnail($parameters) {
-        $img_url              = 'https://img.youtube.com/vi/' . $parameters['video_id'] . '/hqdefault.jpg';
+        $img_url              = 'https://img.youtube.com/vi/' . $parameters['video_id'] . '/maxresdefault.jpg';
         $thumbnail['expires'] = time() + (THUMBNAIL_CACHE_TIME * 60 * 60); //set cache to expire in seconds
         $thumbnail['data']    = base64_encode(file_get_contents($img_url));
 

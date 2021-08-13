@@ -72,8 +72,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             case DOKU_LEXER_EXIT:
             case DOKU_LEXER_ENTER :
                 /** @var array $data */
-                $data = array();
-                return $data;
+                return array();
 
             case DOKU_LEXER_SPECIAL:
             case DOKU_LEXER_MATCHED :
@@ -84,7 +83,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                     try {
                         //get and define config variables
                         define('YT_API_KEY', $this->getConf('YT_API_KEY'));
-                        define('THUMBNAIL_CACHE_TIME', $this->getConf('THUMBNAIL_CACHE_TIME'));
+                        define('THUMBNAIL_CACHE_TIME', $this->getConf('THUMBNAIL_CACHE_TIME') * 60 * 60);
                         define('PLAYLIST_CACHE_TIME', $this->getConf('PLAYLIST_CACHE_TIME'));
                         define('DEFAULT_PRIVACY_DISCLAIMER', $this->getConf('DEFAULT_PRIVACY_DISCLAIMER')); // cam be empty
                         $disclaimers = array();
@@ -144,8 +143,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                     }
                 }
         }
-        $data = array();
-        return $data;
+        return array();
     }
 
     /**
@@ -290,7 +288,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
     private function parseYouTubeVideoString($parameters): array {
         $video_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'video_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
         $video_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false']);
-        $regex                  = '/^((?:https?:)?\/\/)?((?:www|m)\.)?((?:youtube\.com|youtu.be))(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/';
+        $regex                  = '/^((?:https?:)?\/\/)?((?:www|m)\.)?(youtube\.com|youtu.be)(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/';
 
         if(preg_match($regex, $parameters['url'], $match)) {
             $parameters['video_id'] = $match[5];
@@ -311,7 +309,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
     private function parseYouTubePlaylistString($parameters): array {
         $playlist_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'playlist_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
         $playlist_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false']);
-        $regex                     = '/^.*(youtu.be\/|list=)([^#\&\?]*).*/';
+        $regex                     = '/^.*(youtu.be\/|list=)([^#&?]*).*/';
 
         if(preg_match($regex, $parameters['url'], $matches)) {
             $parameters['playlist_id'] = $matches[2]; //set the playlist id
@@ -473,14 +471,33 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
     }
 
     /**
-     * Method for getting youtube thumbnail and storing it as a base64 string in a cache file
+     * Method for getting YouTube thumbnail and storing it as a base64 string in a cache file
      *
      * @param $parameters
+     * @return string
      * @throws InvalidEmbed
      */
-    private function cacheYouTubeThumbnail($parameters) {
-        $img_url              = 'https://img.youtube.com/vi/' . $parameters['video_id'] . '/maxresdefault.jpg';
-        $thumbnail['expires'] = time() + (THUMBNAIL_CACHE_TIME * 60 * 60); //set cache to expire in seconds
+    private function cacheYouTubeThumbnail($parameters): string {
+        $img_url = 'https://img.youtube.com/vi/' . $parameters['video_id'] . '/maxresdefault.jpg';
+        //$hello2 = p_get_metadata($_GET['id']);
+        p_set_metadata($_GET['id'], array('relation' => array('video-ids' => array($parameters['video_id'] => $parameters['video_id']))));
+        p_get_metadata($_GET['id']);
+        try {
+//            $cache_helper = $this->loadHelper('externalembed_embedCacheInterface');
+            $cache = new cache_externalembed($parameters['video_id']);
+            if($cache->useCache(['age' => THUMBNAIL_CACHE_TIME, 'files' => [$cache->cache]])) { //if cache can be used
+                return $cache->retrieveCache();
+            } else {
+                $data = base64_encode(file_get_contents($img_url)); // get new thumbnail
+                $cache->storeCache($data); //update cache
+                return $data;
+            }
+
+        } catch(Exception $e) {
+            throw new InvalidEmbed($e);
+        }
+
+        /*$thumbnail['expires'] = time() + (THUMBNAIL_CACHE_TIME * 60 * 60); //set cache to expire in seconds
         $thumbnail['data']    = base64_encode(file_get_contents($img_url));
 
         if(file_exists($file_cache = CACHE_DIR . '/' . $parameters["video_id"] . '.json')) {
@@ -492,35 +509,37 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             throw new InvalidEmbed('Cannot create cache file: cache/' . $parameters['video_id'] . '.json');
         }
         fwrite($newCache, json_encode($thumbnail));
-        fclose($newCache);
+        fclose($newCache);*/
     }
 
     /**
      * Method for checking the cache for an individual video
      *
-     * If the cache exists and is expired or the cache doesnt exist: fetch data from YouTube and store in a JSON file
+     * If the cache exists and is expired or the cache doesn't exist: fetch data from YouTube and store in a JSON file
      * Otherwise open and return the valid cache array
      *
      * @param $parameters
      * @return mixed
      * @throws InvalidEmbed
      */
-    private function checkThumbnailCache($parameters) {
-        $file_cache = CACHE_DIR . '/' . $parameters['video_id'] . '.json';
-        if(file_exists($file_cache)) {
-            if(!$cached_thumbnail = json_decode(file_get_contents($file_cache), true)) { //open and decode existing cache file
-                throw new InvalidEmbed('Could not open and/or decode existing thumbnail cache file for video: ' . $parameters["video_id"]);
-            }
-            if($cached_thumbnail['expires'] < time()) {
-                $this->cacheYouTubeThumbnail($parameters);
-            }
-        } else {
-            $this->cacheYouTubeThumbnail($parameters);
-        }
-        if(!$cached_thumbnail_file = json_decode(file_get_contents($file_cache), true)) { //open and decode existing cache file
-            throw new InvalidEmbed('Could not open and/or decode existing thumbnail cache file for video: ' . $parameters["video_id"]);
-        }
-        return $cached_thumbnail_file['data'];
+    private function checkThumbnailCache($parameters): string {
+        return $this->cacheYouTubeThumbnail($parameters);
+
+//        $file_cache = CACHE_DIR . '/' . $parameters['video_id'] . '.json';
+//        if(file_exists($file_cache)) {
+//            if(!$cached_thumbnail = json_decode(file_get_contents($file_cache), true)) { //open and decode existing cache file
+//                throw new InvalidEmbed('Could not open and/or decode existing thumbnail cache file for video: ' . $parameters["video_id"]);
+//            }
+//            if($cached_thumbnail['expires'] < time()) {
+//                $this->cacheYouTubeThumbnail($parameters);
+//            }
+//        } else {
+//            $this->cacheYouTubeThumbnail($parameters);
+//        }
+//        if(!$cached_thumbnail_file = json_decode(file_get_contents($file_cache), true)) { //open and decode existing cache file
+//            throw new InvalidEmbed('Could not open and/or decode existing thumbnail cache file for video: ' . $parameters["video_id"]);
+//        }
+//        return $cached_thumbnail_file['data'];
     }
 
     /**
@@ -533,7 +552,9 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @throws InvalidEmbed
      */
     private function checkPlaylistCache($parameters) {
-        $file_cache = CACHE_DIR . '/' . $parameters["playlist_id"] . '.json';
+        return $this->cachePlaylist($parameters);
+
+        /*$file_cache = CACHE_DIR . '/' . $parameters["playlist_id"] . '.json';
         if(file_exists($file_cache)) {
             if(!$cached_playlist = json_decode(file_get_contents($file_cache), true)) {
                 throw new InvalidEmbed('Could not open and/or decode existing cache file for playlist: ' . $parameters["playlist_id"]);
@@ -547,7 +568,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
         if(!$cached_playlist = json_decode(file_get_contents($file_cache))) {
             throw new InvalidEmbed('Could not open and/or decode existing cache file for playlist: ' . $parameters["playlist_id"]);
         }
-        return $cached_playlist;
+        return $cached_playlist;*/
     }
 
     /**
@@ -557,12 +578,13 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * Pre-conditions: Cache is expired or does not exist
      *
      * @param $parameters
+     * @return mixed
      * @throws InvalidEmbed
      */
     private function cachePlaylist($parameters) {
         $video_ids            = array();
         $response             = array();
-        $video_ids['expires'] = time() + (PLAYLIST_CACHE_TIME * 60 * 60); //set cache to expire in seconds
+        $video_ids['expires'] = time() + (PLAYLIST_CACHE_TIME); //set cache to expire in seconds
 
         while(key_exists('nextPageToken', $response) || empty($response)) {
             $response = $this->sendPlaylistRequest($parameters, '&pageToken=' . $response['nextPageToken']);
@@ -571,7 +593,13 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             }
         }
 
-        if(file_exists($file_cache = CACHE_DIR . '/' . $parameters["playlist_id"] . '.json')) {
+        p_set_metadata($_GET['id'], array('relation' => array('playlist-ids' => array($parameters["playlist_id"]))));
+        p_get_metadata($_GET['id']);
+        $cache = new cache_externalembed($parameters['playlist_id']);
+        $cache->storeCache(json_encode($video_ids));
+        return json_decode($cache->retrieveCache(), true);
+
+        /*if(file_exists($file_cache = CACHE_DIR . '/' . $parameters["playlist_id"] . '.json')) {
             if(!unlink($file_cache)) {
                 throw new InvalidEmbed('Could not delete old cache file for playlist: ' . $parameters["playlist_id"]);
             }
@@ -580,7 +608,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             throw new InvalidEmbed('Cannot create cache file: cache/' . $parameters['playlist_id'] . '.json');
         }
         fwrite($newCache, json_encode($video_ids));
-        fclose($newCache);
+        fclose($newCache);*/
     }
 
     /**
@@ -619,5 +647,33 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
         }
         curl_close($curl);
         return $api_response;
+    }
+}
+
+class cache_externalembed extends \dokuwiki\Cache\Cache {
+    public $e_tag = '';
+    var $_etag_time;
+
+    public function __construct($embed_id) {
+        parent::__construct($embed_id, '.externalembed');
+        $this->e_tag = substr($this->cache, 0, -15) . '.etag';
+    }
+
+    public function getETag($clean = true) {
+        return io_readFile($this->e_tag, $clean);
+    }
+
+    public function storeETag($e_tag_value): bool {
+        if($this->_nocache) return false;
+
+        return io_saveFile($this->e_tag, $e_tag_value);
+    }
+
+    public function checkETag($expireTime): bool {
+        if($expireTime < 0) return true;
+        if($expireTime == 0) return false;
+        if(!($this->_etag_time = @filemtime($this->e_tag))) return false; //check if cache is still there
+        if((time() - $this->_etag_time) > $expireTime) return false; //Cache has expired
+        return true;
     }
 }

@@ -1,4 +1,6 @@
-<?php /** @noinspection DuplicatedCode */
+<?php /** @noinspection PhpPossiblePolymorphicInvocationInspection */
+/** @noinspection PhpUnused */
+/** @noinspection DuplicatedCode */
 /**
  * DokuWiki Plugin externalembed (Syntax Component)
  *
@@ -66,6 +68,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @param Doku_Handler $handler The handler
      *
      * @return array Data for the renderer
+     * @noinspection PhpMissingParamTypeInspection
      */
     function handle($match, $state, $pos, $handler): array {
         switch($state) {
@@ -89,11 +92,11 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                         $disclaimers = array();
                         define('DOMAIN_WHITELIST', $this->getDomains($this->getConf('DOMAIN_WHITELIST'), $disclaimers));
                         define('DISCLAIMERS', $disclaimers); //can be empty
-                        define('CACHE_DIR', $GLOBALS["conf"]["cachedir"] . '/plugin_externalembed');
                         define('MINIMUM_EMBED_WIDTH', $this->getConf('MINIMUM_EMBED_WIDTH'));
                         define('MINIMUM_EMBED_HEIGHT', $this->getConf('MINIMUM_EMBED_WIDTH'));
-                        if(!file_exists(CACHE_DIR)) {
-                            mkdir(CACHE_DIR, 0777, true);
+
+                        if(!($cacheHelper = $this->loadHelper('externalembed_cacheInterface'))) {
+                            throw new InvalidEmbed('Could not load cache interface helper');
                         }
 
                         //validate config variables
@@ -107,22 +110,23 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                         $parameters['type'] = $embed_type;
                         //gets the embed type and checks if the domain is in the whitelist
 
+                        //MAIN PROGRAM:
                         switch(true) {
                             case ($embed_type === "youtube_video"):
-                                $validated_parameters                      = $this->parseYouTubeVideoString($parameters);
-                                $yt_request                                = $this->getVideoRequest($validated_parameters);
-                                $validated_parameters['thumbnail'] = $this->checkThumbnailCache($validated_parameters);
-                                $html                                      = $this->renderJSON($yt_request, $validated_parameters);
-                                return array('embed_html' => $html);
+                                $validated_parameters              = $this->parseYouTubeVideoString($parameters);
+                                $yt_request                        = $this->getVideoRequest($validated_parameters);
+                                $validated_parameters['thumbnail'] = $this->cacheYouTubeThumbnail($cacheHelper, $validated_parameters['video_id']);
+                                $html                              = $this->renderJSON($yt_request, $validated_parameters);
+                                return array('embed_html' => $html, 'video_ID' => $validated_parameters['video_id']); //return html and metadata
                             case ($embed_type === "youtube_playlist"):
-                                $validated_parameters                      = $this->parseYouTubePlaylistString($parameters);
-                                $playlist_cache                            = $this->checkPlaylistCache($validated_parameters);
-                                $cached_video_id                           = $this->getLatestVideo($playlist_cache);
-                                $validated_parameters['video_id']          = $cached_video_id;
-                                $validated_parameters['thumbnail'] = $this->checkThumbnailCache($validated_parameters);
-                                $yt_request                                = $this->getVideoRequest($validated_parameters);
-                                $html                                      = $this->renderJSON($yt_request, $validated_parameters);
-                                return array('embed_html' => $html);
+                                $validated_parameters              = $this->parseYouTubePlaylistString($parameters);
+                                $playlist_cache                    = $this->cachePlaylist($cacheHelper, $validated_parameters);
+                                $cached_video_id                   = $this->getLatestVideo($playlist_cache);
+                                $validated_parameters['video_id']  = $cached_video_id; //adds the video ID to the metadata later
+                                $validated_parameters['thumbnail'] = $this->cacheYouTubeThumbnail($cacheHelper, $validated_parameters['video_id']);
+                                $yt_request                        = $this->getVideoRequest($validated_parameters);
+                                $html                              = $this->renderJSON($yt_request, $validated_parameters);
+                                return array('embed_html' => $html, 'video_ID' => $validated_parameters['video_id'], 'playlist_ID' => $validated_parameters['playlist_id']);
                             case ($embed_type === 'fusion'):
                                 $validated_parameters = $this->parseFusionString($parameters);
                                 $fusion_request       = $this->getFusionRequest($validated_parameters);
@@ -157,26 +161,64 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @noinspection PhpParameterNameChangedDuringInheritanceInspection
      */
     public function render($mode, Doku_Renderer $renderer, $data): bool {
-        if($mode !== 'xhtml') {
+        if($data === false) return false;
+
+        if($mode == 'xhtml') {
+            if(!empty($data['embed_html'])) {
+                $renderer->doc .= $data['embed_html'];
+                return true;
+            } else {
+                return false;
+            }
+        } elseif($mode == 'metadata') {
+            if(!empty($data['video_ID'])) {
+                /** @var Doku_Renderer_metadata $renderer */
+                // erase tags on persistent metadata no more used
+                if(isset($renderer->persistent['plugin']['externalembed']['video_ids'])) {
+                    //unset($renderer->meta['plugin']['externalembed']['video_ids']);
+                    unset($renderer->persistent['plugin']['externalembed']['video_ids']);
+                    $renderer->meta['plugin']['externalembed']['video_ids'] = array();
+                    //$renderer->persistent['plugin']['externalembed']['video_ids'] = array();
+                }
+
+                // merge with previous tags and make the values unique
+                if(!isset($renderer->meta['plugin']['externalembed']['video_ids'])) $renderer->meta['plugin']['externalembed']['video_ids'] = array();
+                //$renderer->persistent['plugin']['externalembed']['video_ids'] = array();
+
+                $renderer->meta['plugin']['externalembed']['video_ids'] = array_unique(array_merge($renderer->meta['plugin']['externalembed']['video_ids'], array($data['video_ID'])));
+                //$renderer->persistent['plugin']['externalembed']['video_ids'] = array_unique(array_merge($renderer->persistent['plugin']['externalembed']['video_ids'], array($data['video_ID'])));
+
+                if(!empty($data['playlist_ID'])) {
+                    if(isset($renderer->persistent['plugin']['externalembed']['playlist_ids'])) {
+                        unset($renderer->persistent['plugin']['externalembed']['playlist_ids']);
+                        $renderer->meta['plugin']['externalembed']['playlist_ids']       = array();
+                        $renderer->persistent['plugin']['externalembed']['playlist_ids'] = array();
+                    }
+
+                    if(!isset($renderer->meta['plugin']['externalembed']['playlist_ids'])) {
+                        $renderer->meta['plugin']['externalembed']['playlist_ids']       = array();
+                        $renderer->persistent['plugin']['externalembed']['playlist_ids'] = array();
+                    }
+                    $renderer->meta['plugin']['externalembed']['playlist_ids']       = array_unique(array_merge($renderer->meta['plugin']['externalembed']['playlist_ids'], array($data['playlist_ID'])));
+                    $renderer->persistent['plugin']['externalembed']['playlist_ids'] = array_unique(array_merge($renderer->persistent['plugin']['externalembed']['playlist_ids'], array($data['playlist_ID'])));
+
+                }
+                return true;
+            }
             return false;
         }
-        if(!empty($data['embed_html'])) {
-            $renderer->doc .= $data['embed_html'];
-            return true;
-        } else {
-            return false;
-        }
+        return false;
     }
 
     /**
-     * Method that generates a HTML iframe for embedded content
-     * Substitutes default privacy disclaimer if none is found the the disclaimers array
+     * Method that generates an HTML iframe for embedded content
+     * Substitutes default privacy disclaimer if none is found the disclaimers array
      *
      * @param $request    string the source url
      * @param $parameters array iframe attributes and url data
      * @return string the html to embed
      */
-    private function renderJSON($request, $parameters): string {
+    private function renderJSON(string $request, array $parameters): string {
         $parameters['disclaimer'] = DEFAULT_PRIVACY_DISCLAIMER;
         $parameters['request']    = $request;
         $type                     = $parameters['type'];
@@ -204,8 +246,8 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * Check to see if domain in the url is in the domain whitelist.
      *
      * Check url to determine the type of embed
-     * If the url is a youtube playlist, the embed will show the latest video in the playlist
-     * If the url is a youtube video, the embed will only show the video
+     * If the url is a YouTube playlist, the embed will show the latest video in the playlist
+     * If the url is a YouTube video, the embed will only show the video
      * Else the type is 'other' as long as the domain is on the whitelist
      *
      * @param $parameters
@@ -221,10 +263,10 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
         $embed_type = 'other';
 
         if($parameters['domain'] === 'youtube.com' || $parameters['domain'] === 'youtu.be') {
-            //determine if the url is a video or a playlist
+            //determine if the url is a video or a playlist https://youtu.be/clD_8BItvh4
             if(strpos($parameters['url'], 'playlist?list=') !== false) {
                 return 'youtube_playlist';
-            } else if(strpos($parameters['url'], '/watch') !== false) {
+            } else if((strpos($parameters['url'], '/watch') || strpos($parameters['url'], 'youtu.be/')) !== false) {
                 return 'youtube_video';
             } else {
                 throw new InvalidEmbed("Unknown youtube url");
@@ -238,7 +280,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
     }
 
     /**
-     * Method that checks the domain entered by the user against the accepted whitelist of domains set in the configuration manager
+     * Method that checks the domain entered by the user against the accepted whitelist of domains sets in the configuration manager
      *
      * @param $url
      * @return string The valid domain
@@ -267,7 +309,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @param $disclaimers      array array that stores the disclaimers for each accepted domain
      * @return array
      */
-    private function getDomains($whitelist_string, &$disclaimers): array {
+    private function getDomains(string $whitelist_string, array &$disclaimers): array {
         $domains = array();
         $items   = explode("\n", $whitelist_string);
         foreach($items as $domain_disclaimer) {
@@ -467,213 +509,33 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @return string //returns the last video in the cache (the latest one)
      */
     private function getLatestVideo($video_cache): string {
-        return end($video_cache);
+        $cache_data = json_decode($video_cache->retrieveCache());
+        return end($cache_data);
     }
 
     /**
      * Method for getting YouTube thumbnail and storing it as a base64 string in a cache file
      *
-     * @param $parameters
-     * @return string
-     * @throws InvalidEmbed
+     * @param $cache_helper object The ExternalEmbedInterface
+     * @param $video_id     string the YouTube video ID
+     * @return string YouTube Thumbnail as a base 64 string
      */
-    private function cacheYouTubeThumbnail($parameters): string {
-        $img_url = 'https://img.youtube.com/vi/' . $parameters['video_id'] . '/maxresdefault.jpg';
-        //$hello2 = p_get_metadata($_GET['id']);
-        p_set_metadata($_GET['id'], array('relation' => array('video-ids' => array($parameters['video_id'] => $parameters['video_id']))));
-        p_get_metadata($_GET['id']);
-        try {
-//            $cache_helper = $this->loadHelper('externalembed_embedCacheInterface');
-            $cache = new cache_externalembed($parameters['video_id']);
-            if($cache->useCache(['age' => THUMBNAIL_CACHE_TIME, 'files' => [$cache->cache]])) { //if cache can be used
-                return $cache->retrieveCache();
-            } else {
-                $data = base64_encode(file_get_contents($img_url)); // get new thumbnail
-                $cache->storeCache($data); //update cache
-                return $data;
-            }
-
-        } catch(Exception $e) {
-            throw new InvalidEmbed($e);
-        }
-
-        /*$thumbnail['expires'] = time() + (THUMBNAIL_CACHE_TIME * 60 * 60); //set cache to expire in seconds
-        $thumbnail['data']    = base64_encode(file_get_contents($img_url));
-
-        if(file_exists($file_cache = CACHE_DIR . '/' . $parameters["video_id"] . '.json')) {
-            if(!unlink($file_cache)) {
-                throw new InvalidEmbed('Could not delete old thumbnail cache file for video: ' . $parameters["video_id"]);
-            }
-        }
-        if(!$newCache = fopen(CACHE_DIR . '/' . $parameters["video_id"] . '.json', "w")) {
-            throw new InvalidEmbed('Cannot create cache file: cache/' . $parameters['video_id'] . '.json');
-        }
-        fwrite($newCache, json_encode($thumbnail));
-        fclose($newCache);*/
-    }
-
-    /**
-     * Method for checking the cache for an individual video
-     *
-     * If the cache exists and is expired or the cache doesn't exist: fetch data from YouTube and store in a JSON file
-     * Otherwise open and return the valid cache array
-     *
-     * @param $parameters
-     * @return mixed
-     * @throws InvalidEmbed
-     */
-    private function checkThumbnailCache($parameters): string {
-        return $this->cacheYouTubeThumbnail($parameters);
-
-//        $file_cache = CACHE_DIR . '/' . $parameters['video_id'] . '.json';
-//        if(file_exists($file_cache)) {
-//            if(!$cached_thumbnail = json_decode(file_get_contents($file_cache), true)) { //open and decode existing cache file
-//                throw new InvalidEmbed('Could not open and/or decode existing thumbnail cache file for video: ' . $parameters["video_id"]);
-//            }
-//            if($cached_thumbnail['expires'] < time()) {
-//                $this->cacheYouTubeThumbnail($parameters);
-//            }
-//        } else {
-//            $this->cacheYouTubeThumbnail($parameters);
-//        }
-//        if(!$cached_thumbnail_file = json_decode(file_get_contents($file_cache), true)) { //open and decode existing cache file
-//            throw new InvalidEmbed('Could not open and/or decode existing thumbnail cache file for video: ' . $parameters["video_id"]);
-//        }
-//        return $cached_thumbnail_file['data'];
-    }
-
-    /**
-     * Method for checking the cache for a given playlist
-     * If the cache exists and is expired or the cache doesnt exist: fetch data from YouTube and store in a JSON file
-     * Otherwise open and return the valid cache array
-     *
-     * @param $parameters
-     * @return mixed
-     * @throws InvalidEmbed
-     */
-    private function checkPlaylistCache($parameters) {
-        return $this->cachePlaylist($parameters);
-
-        /*$file_cache = CACHE_DIR . '/' . $parameters["playlist_id"] . '.json';
-        if(file_exists($file_cache)) {
-            if(!$cached_playlist = json_decode(file_get_contents($file_cache), true)) {
-                throw new InvalidEmbed('Could not open and/or decode existing cache file for playlist: ' . $parameters["playlist_id"]);
-            }
-            if($cached_playlist['expires'] < time()) { //if the cache has expired:
-                $this->cachePlaylist($parameters); //generate new cache
-            }
-        } else { //if file does not exist:
-            $this->cachePlaylist($parameters); //cache the new playlist
-        }
-        if(!$cached_playlist = json_decode(file_get_contents($file_cache))) {
-            throw new InvalidEmbed('Could not open and/or decode existing cache file for playlist: ' . $parameters["playlist_id"]);
-        }
-        return $cached_playlist;*/
+    private function cacheYouTubeThumbnail(object $cache_helper, string $video_id): string {
+        $thumbnail = $cache_helper->getYouTubeThumbnail($video_id);
+        $cache_helper->cacheYouTubeThumbnail($video_id, $thumbnail); //use the helper interface to create the cache
+        return $thumbnail['thumbnail']; //return the thumbnail encoded data
     }
 
     /**
      * Generates a cache json file using the playlist ID.
      * The cache file stores all the video ids from the playlist
      *
-     * Pre-conditions: Cache is expired or does not exist
-     *
+     * @param $cacheHelper
      * @param $parameters
      * @return mixed
-     * @throws InvalidEmbed
      */
-    private function cachePlaylist($parameters) {
-        $video_ids            = array();
-        $response             = array();
-        $video_ids['expires'] = time() + (PLAYLIST_CACHE_TIME); //set cache to expire in seconds
-
-        while(key_exists('nextPageToken', $response) || empty($response)) {
-            $response = $this->sendPlaylistRequest($parameters, '&pageToken=' . $response['nextPageToken']);
-            foreach($response['items'] as $video) {
-                array_push($video_ids, $video['contentDetails']['videoId']);
-            }
-        }
-
-        p_set_metadata($_GET['id'], array('relation' => array('playlist-ids' => array($parameters["playlist_id"]))));
-        p_get_metadata($_GET['id']);
-        $cache = new cache_externalembed($parameters['playlist_id']);
-        $cache->storeCache(json_encode($video_ids));
-        return json_decode($cache->retrieveCache(), true);
-
-        /*if(file_exists($file_cache = CACHE_DIR . '/' . $parameters["playlist_id"] . '.json')) {
-            if(!unlink($file_cache)) {
-                throw new InvalidEmbed('Could not delete old cache file for playlist: ' . $parameters["playlist_id"]);
-            }
-        }
-        if(!$newCache = fopen(CACHE_DIR . '/' . $parameters["playlist_id"] . '.json', "w")) {
-            throw new InvalidEmbed('Cannot create cache file: cache/' . $parameters['playlist_id'] . '.json');
-        }
-        fwrite($newCache, json_encode($video_ids));
-        fclose($newCache);*/
-    }
-
-    /**
-     * Method for getting the videos in a playlist using the Youtube Data API v3
-     *
-     * @param        $parameters
-     * @param string $next_page_token
-     * @return mixed
-     * @throws InvalidEmbed
-     */
-    private function sendPlaylistRequest($parameters, $next_page_token = '') {
-        $url  = 'https://youtube.googleapis.com/youtube/v3/playlistItems?part=contentDetails&maxResults=50' . $next_page_token . '&playlistId=' . $parameters["playlist_id"] . '&key=AIzaSyCJFeNmYo-K7tzh9FfHeo8MACrPkJ8zi_Y';
-        $curl = curl_init($url);
-        curl_setopt($curl, CURLOPT_URL, $url);
-        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
-
-        $headers = array(
-            'Accept: application/json'
-        );
-
-        curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
-
-        //TODO: remove once in production:
-        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, false);
-        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, false);//
-
-        $api_response = json_decode(curl_exec($curl), true); //decode JSON to associative array
-
-        if(curl_getinfo($curl, CURLINFO_HTTP_CODE) != 200) {
-            if(key_exists("error", $api_response)) {
-                $message = $api_response['error']['message'];
-            } else {
-                $message = "Unknown API api_response error";
-            }
-            throw new InvalidEmbed($message);
-        }
-        curl_close($curl);
-        return $api_response;
-    }
-}
-
-class cache_externalembed extends \dokuwiki\Cache\Cache {
-    public $e_tag = '';
-    var $_etag_time;
-
-    public function __construct($embed_id) {
-        parent::__construct($embed_id, '.externalembed');
-        $this->e_tag = substr($this->cache, 0, -15) . '.etag';
-    }
-
-    public function getETag($clean = true) {
-        return io_readFile($this->e_tag, $clean);
-    }
-
-    public function storeETag($e_tag_value): bool {
-        if($this->_nocache) return false;
-
-        return io_saveFile($this->e_tag, $e_tag_value);
-    }
-
-    public function checkETag($expireTime): bool {
-        if($expireTime < 0) return true;
-        if($expireTime == 0) return false;
-        if(!($this->_etag_time = @filemtime($this->e_tag))) return false; //check if cache is still there
-        if((time() - $this->_etag_time) > $expireTime) return false; //Cache has expired
-        return true;
+    private function cachePlaylist($cacheHelper, $parameters) {
+        $playlist_data = $cacheHelper->getPlaylist($parameters['playlist_id']);
+        return $cacheHelper->cachePlaylist($parameters['playlist_id'], $playlist_data);
     }
 }

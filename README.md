@@ -4,10 +4,11 @@ A Dokuwiki plugin to embed external content from the web
 
 ## Prerequisites:
 
-To embed youtube content:
-* Go to https://console.cloud.google.com/ and create a google developer account
+To embed YouTube content:
+
+* Go to https://console.cloud.google.com/ and create a Google developer account
 * Once registered add a YouTube Data API v3 API to your account.
-* When setting up, restrict the key to only use the youtube data API. You also may want to set an application
+* When setting up, restrict the key to only use the YouTube data API. You also may want to set an application
   restriction for a production server.
 
 ## Installation
@@ -42,15 +43,18 @@ Required Parameters:
 
 * `url: ` - The URL associated with the embed
 
-### Video:
+### YouTube Video:
 
 To display a video from YouTube use the following syntax:  
 `{{external_embed>url: "https://www.youtube.com/watch?v=UKvqC3t-M1g&ab_channel=Wintergatan" | autoplay: "true" | width: "720" | height: "480" | mute: "true" | controls: "false"}}`
 
 Optional Parameters:
 
-* `width` - The width of the iframe. Default is 1280
-* `height` - The height of the iframe. Default is 720
+* `height` - Sets the maximum height of the iframe. Values:
+  * `360`
+  * `480`
+  * `720` - Default
+  * `1080`
 * `autoplay` - Specifies if the video will autoplay when the page is loaded. Values:
   * `true`
   * `false` - Default
@@ -64,15 +68,15 @@ Optional Parameters:
 
 `{{external_embed>url: https://www.youtube.com/watch?v=UKvqC3t-M1g&ab_channel=Wintergatan" | autoplay: "true" | width: "720" | height: "480" | mute: "true" | controls: "false"}}`
 
-### The Latest Video From Playlist:
+### YouTube Playlist - The Latest Video:
 
 The following syntax is used to get the latest video from a YouTube playlist.
 
 Note that the rendered dokuwiki page is cached, you may want to find a way to auto purge your cache so that your videos
 stay up to date: https://www.dokuwiki.org/devel:caching
 
-The video ID's are stored in a json cache file named <playlistID>.json - these cache files last for the number of hours
-set in the config file.  
+The video ID's are stored and cached in a json cache file - these cache files last for the number of hours set in the
+config file.  
 This is to prevent and reduce the number of calls needed to the YouTube API (maximum is 10,000 per day)  
 `{{external_embed>url: "PLAYLIST_URL"}}`
 
@@ -82,12 +86,12 @@ The same optional parameters used for the video type can also be used when using
 
 #### Example:
 
-`{{external_embed>url: "https://www.youtube.com/playlist?list=PLLLYkE3G1HED6rW-bkliHbMroHYFf4ukv" | autoplay: "true" | width: "720" | height: "480" | mute: "true"}}`
+`{{external_embed>url: "https://www.youtube.com/playlist?list=PLLLYkE3G1HED6rW-bkliHbMroHYFf4ukv" | autoplay: "true" | height: "480" | mute: "true"}}`
 
 ### Fusion:
 
 The following syntax is used to embed a fusion file using the fusion web player:
-`{{external_embed>url: FUSION_URL | width: "720" | height: "480 | allowFullScreen: "false"`
+`{{external_embed>url: FUSION_URL | height: "480 | allowFullScreen: "false"`
 
 Optional Parameters:
 

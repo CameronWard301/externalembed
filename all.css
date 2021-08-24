@@ -1,0 +1,17 @@
+/*@media only screen and (max-width: 800px){
+    .externalembed_embed{
+        width: auto !important;
+    }
+}*/
+
+@media screen and (max-width: 374px) {
+    .externalembed_disclaimer {
+        width: auto;
+        height: auto;
+        position: unset;
+        transform: unset;
+        display: grid;
+        background-color: rgba(33, 33, 33, 0.8);
+        margin-bottom: 10px;
+    }
+}

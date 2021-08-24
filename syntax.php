@@ -100,10 +100,18 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                         }
 
                         //validate config variables
-                        if(empty(YT_API_KEY)) throw new InvalidEmbed('Empty API Key, set this in the configuration manager in the admin panel');
-                        if(empty(THUMBNAIL_CACHE_TIME)) throw new InvalidEmbed('Empty cache time for thumbnails, set this in the configuration manager in the admin panel');
-                        if(empty(PLAYLIST_CACHE_TIME)) throw new InvalidEmbed('Empty cache time for playlists, set this in the configuration manager in the admin panel');
-                        if(empty(DOMAIN_WHITELIST)) throw new InvalidEmbed('Empty domain whitelist, set this in the configuration manager in the admin panel');
+                        if(empty(YT_API_KEY)) {
+                            throw new InvalidEmbed('Empty API Key, set this in the configuration manager in the admin panel');
+                        }
+                        if(empty(THUMBNAIL_CACHE_TIME)) {
+                            throw new InvalidEmbed('Empty cache time for thumbnails, set this in the configuration manager in the admin panel');
+                        }
+                        if(empty(PLAYLIST_CACHE_TIME)) {
+                            throw new InvalidEmbed('Empty cache time for playlists, set this in the configuration manager in the admin panel');
+                        }
+                        if(empty(DOMAIN_WHITELIST)) {
+                            throw new InvalidEmbed('Empty domain whitelist, set this in the configuration manager in the admin panel');
+                        }
 
                         $parameters         = $this->getParameters($match);
                         $embed_type         = $this->getEmbedType($parameters);
@@ -182,7 +190,9 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                 }
 
                 // merge with previous tags and make the values unique
-                if(!isset($renderer->meta['plugin']['externalembed']['video_ids'])) $renderer->meta['plugin']['externalembed']['video_ids'] = array();
+                if(!isset($renderer->meta['plugin']['externalembed']['video_ids'])) {
+                    $renderer->meta['plugin']['externalembed']['video_ids'] = array();
+                }
                 //$renderer->persistent['plugin']['externalembed']['video_ids'] = array();
 
                 $renderer->meta['plugin']['externalembed']['video_ids'] = array_unique(array_merge($renderer->meta['plugin']['externalembed']['video_ids'], array($data['video_ID'])));
@@ -217,12 +227,13 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @param $request    string the source url
      * @param $parameters array iframe attributes and url data
      * @return string the html to embed
+     * @throws InvalidEmbed
      */
     private function renderJSON(string $request, array $parameters): string {
         $parameters['disclaimer'] = DEFAULT_PRIVACY_DISCLAIMER;
         $parameters['request']    = $request;
         $type                     = $parameters['type'];
-
+        $parameters['size']       = $this->getEmbedSize($parameters);
         //remove unnecessary parameters that don't need to be sent
         unset(
             $parameters['url'],
@@ -230,7 +241,8 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             $parameters['autoplay'],
             $parameters['loop'],
             $parameters['mute'],
-            $parameters['controls']
+            $parameters['controls'],
+            //$parameters['width']
         );
 
         if(key_exists($parameters['domain'], DISCLAIMERS)) { //if there is a unique disclaimer for the domain, replace the default value with custom value
@@ -239,7 +251,29 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             }
         }
         $dataJSON = json_encode(array_map("utf8_encode", $parameters));
-        return '<div class="externalembed_embed externalembed_embedType-' . htmlspecialchars($type) . '" data-json=\'' . $dataJSON . '\'></div>';
+        return '<div class="externalembed_embed externalembed_TOS ' . $parameters['size'] . ' externalembed_embedType-' . htmlspecialchars($type) . '" data-json=\'' . $dataJSON . '\'></div>';
+    }
+
+    /**
+     * Selects the class to add to the embed so that its size is correct
+     * @param $parameters
+     * @return string
+     * @throws InvalidEmbed
+     */
+    private function getEmbedSize(&$parameters): string {
+        switch($parameters['height']) {
+            case '360':
+                $parameters['width'] = '640';
+                return 'externalembed_height_360';
+            case '480':
+                $parameters['width'] = '854';
+                return 'externalembed_height_480';
+            case '720':
+                $parameters['width'] = '1280';
+                return 'externalembed_height_720';
+            default:
+                throw new InvalidEmbed('Unknown width value for size class');
+        }
     }
 
     /**
@@ -328,8 +362,8 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @throws InvalidEmbed
      */
     private function parseYouTubeVideoString($parameters): array {
-        $video_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'video_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
-        $video_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false']);
+        $video_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'video_id' => true, 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
+        $video_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false'], 'height' => ['360', '480', '720']);
         $regex                  = '/^((?:https?:)?\/\/)?((?:www|m)\.)?(youtube\.com|youtu.be)(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/';
 
         if(preg_match($regex, $parameters['url'], $match)) {
@@ -349,8 +383,8 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @throws InvalidEmbed
      */
     private function parseYouTubePlaylistString($parameters): array {
-        $playlist_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'playlist_id' => true, 'width' => '1280', 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
-        $playlist_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false']);
+        $playlist_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'playlist_id' => true, 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
+        $playlist_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false'], 'height' => ['360', '480', '720']);
         $regex                     = '/^.*(youtu.be\/|list=)([^#&?]*).*/';
 
         if(preg_match($regex, $parameters['url'], $matches)) {
@@ -443,7 +477,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
                 }
             }
         }
-        if(intval($query_array['width']) < MINIMUM_EMBED_WIDTH) $query_array['width'] = MINIMUM_EMBED_WIDTH;
+        //if(intval($query_array['width']) < MINIMUM_EMBED_WIDTH) $query_array['width'] = MINIMUM_EMBED_WIDTH;
         if(intval($query_array['height']) < MINIMUM_EMBED_WIDTH) $query_array['height'] = MINIMUM_EMBED_HEIGHT;
 
         foreach($query_array as $key => $value) {

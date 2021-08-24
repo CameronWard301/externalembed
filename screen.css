@@ -1,19 +1,54 @@
 
-.externalembed_embed {
-    background-color: #0002;
-    margin: 20px;
+.externalembed_TOS {
+    margin-top: 10px;
+    margin-bottom: 10px;
     text-align: center;
     overflow: hidden;
+    height: 100%;
+    position: relative;
+    /*max-width: 100%;*/
+}
+
+.externalembed_iframe_container {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    padding-top: 56.25%;
+}
+
+.externalembed_iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.externalembed_height_360 {
+    max-width: 640px;
+}
+
+.externalembed_height_480 {
+    max-width: 854px;
+}
+
+.externalembed_height_720 {
+    max-width: 1280px;
 }
 
 .externalembed_disclaimer {
     color: white;
-    position: relative;
-    bottom: 50%;
+    position: absolute;
+    bottom: 0;
     left: 50%;
-    transform: translate(-50%, -50%);
+    display: block;
+    /*transform: translate(0%, -100%);*/
+    transform: translate(-50%);
     text-align: center;
-    max-width: 300px;
+    width: 70%;
+    max-width: 100%;
     background-color: rgba(33, 33, 33, 0.6);
     border-radius: 10px;
     padding: 10px;
@@ -24,6 +59,11 @@
     border: gray;
     border-radius: 5px;
 
+}
+
+.externalembed_disclaimer a {
+    color: #f84e2e !important;
+    text-decoration: underline !important;
 }
 
 .externalembed_embed > img {

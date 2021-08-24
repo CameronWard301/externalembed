@@ -92,17 +92,26 @@ class action_plugin_externalembed extends DokuWiki_Action_Plugin {
     public function handle_parser_cache_use(Doku_Event &$event, $param) {
         $page_cache =& $event->data;
 
-        if(!isset($page_cache->page)) return;
-        if(!isset($page_cache->mode) || $page_cache->mode != 'xhtml') return;
+        if(!isset($page_cache->page)) {
+            return;
+        }
+        if(!isset($page_cache->mode) || $page_cache->mode != 'xhtml') {
+            return;
+        }
 
         if(!($cacheHelper = $this->loadHelper('externalembed_cacheInterface'))) { //load the helper functions
             echo 'Could not load cache interface helper';
         }
 
         $metadata = p_get_metadata($page_cache->page, 'plugin');
-        if(empty($metadata['externalembed'])) return;
+
+        if(empty($metadata['externalembed'])) {
+            return;
+        }
+
         $video_ids    = $metadata['externalembed']['video_ids'];
         $playlist_ids = $metadata['externalembed']['playlist_ids'];
+
         try {
             if(!empty($video_ids)) {
                 $expire_time = $this->getConf('THUMBNAIL_CACHE_TIME') * 60 * 60;

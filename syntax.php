@@ -271,6 +271,9 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             case '720':
                 $parameters['width'] = '1280';
                 return 'externalembed_height_720';
+            case '1080':
+                $parameters['width'] = '1920';
+                return 'externalembed_height_1080';
             default:
                 throw new InvalidEmbed('Unknown width value for size class');
         }
@@ -363,7 +366,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      */
     private function parseYouTubeVideoString($parameters): array {
         $video_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'video_id' => true, 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
-        $video_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false'], 'height' => ['360', '480', '720']);
+        $video_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false'], 'height' => ['360', '480', '720', '1080']);
         $regex                  = '/^((?:https?:)?\/\/)?((?:www|m)\.)?(youtube\.com|youtu.be)(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/';
 
         if(preg_match($regex, $parameters['url'], $match)) {
@@ -384,7 +387,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      */
     private function parseYouTubePlaylistString($parameters): array {
         $playlist_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'playlist_id' => true, 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
-        $playlist_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false'], 'height' => ['360', '480', '720']);
+        $playlist_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false'], 'height' => ['360', '480', '720', '1080']);
         $regex                     = '/^.*(youtu.be\/|list=)([^#&?]*).*/';
 
         if(preg_match($regex, $parameters['url'], $matches)) {

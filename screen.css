@@ -38,6 +38,10 @@
     max-width: 1280px;
 }
 
+.externalembed_height_1080 {
+    max-width: 1920px;
+}
+
 .externalembed_disclaimer {
     color: white;
     position: absolute;

@@ -1,6 +1,16 @@
 # Dokuwiki External Embed
 
-A Dokuwiki plugin to embed external content from the web
+A Dokuwiki plugin to embed external content from the web  
+This plugin includes domain privacy features allow you to embed content without needing a cookie / privacy policy for
+the embedded content This plugin will ask the user to accept embedded content from a domain before loading it (
+preventing it from loading trackers and cookies to the user's browser without consent) - see DOMAIN_WHITELIST
+
+## The road map:
+
+* Currently, only YouTube has been tested with this plugin. I would like to make it more robust so that content from
+  other domains can also be easily embedded (it is currently possible in this version however)
+
+_____
 
 ## Prerequisites:
 
@@ -28,7 +38,7 @@ To embed YouTube content:
   Enter the domain you want to whitelist. If you wish to set a custom disclaimer for this domain use a comma (see
   example below:)
   * `youtube.com, A YouTube video has been embedded here. You must accept the <a href="https://www.youtube.com/static?template=terms" target="_blank" rel="noopener">terms and conditions</a> in order to view the video`
-  * Note how you can use standard HTML here to embed TOS links.
+  * Note how you can use standard HTML here to embed Terms Of Service links.
   * Separate each whitelist item with a new line
 
 ## Usage:
@@ -71,6 +81,7 @@ Optional Parameters:
 * `controls` - Specifies if the iframe will have video controls.
   * `true` - Default
   * `false`
+
 #### Example:
 
 `{{external_embed>url: https://www.youtube.com/watch?v=UKvqC3t-M1g&ab_channel=Wintergatan" | autoplay: "true" | width: "720" | height: "480" | mute: "true" | controls: "false"}}`

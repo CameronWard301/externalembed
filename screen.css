@@ -82,7 +82,7 @@
 .externalembed_tosRejected > .externalembed_disclaimer {
     position: static;
     transform: unset;
-    text-align: left;
+    text-align: center;
     max-width: 100%;
 }
 

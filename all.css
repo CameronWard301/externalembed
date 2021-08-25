@@ -9,7 +9,7 @@
         width: auto;
         height: auto;
         position: unset;
-        transform: unset;
+        transform: none;
         display: grid;
         background-color: rgba(33, 33, 33, 0.8);
         margin-bottom: 10px;

@@ -234,6 +234,17 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
         $parameters['request']    = $request;
         $type                     = $parameters['type'];
         $parameters['size']       = $this->getEmbedSize($parameters);
+
+        if($parameters['embed-position'] == "centre") {
+            $position = "mediacenter";
+        } elseif($parameters['embed-position'] == 'right') {
+            $position = "mediaright";
+        } elseif($parameters['embed-position'] == "left") {
+            $position = "medialeft";
+        } else {
+            $position = '';
+        }
+
         //remove unnecessary parameters that don't need to be sent
         unset(
             $parameters['url'],
@@ -242,7 +253,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             $parameters['loop'],
             $parameters['mute'],
             $parameters['controls'],
-            //$parameters['width']
+            $parameters['embed-position']
         );
 
         if(key_exists($parameters['domain'], DISCLAIMERS)) { //if there is a unique disclaimer for the domain, replace the default value with custom value
@@ -251,7 +262,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             }
         }
         $dataJSON = json_encode(array_map("utf8_encode", $parameters));
-        return '<div class="externalembed_embed externalembed_TOS ' . $parameters['size'] . ' externalembed_embedType-' . htmlspecialchars($type) . '" data-json=\'' . $dataJSON . '\'></div>';
+        return '<div class="' . $position . ' externalembed_embed externalembed_TOS ' . $parameters['size'] . ' externalembed_embedType-' . htmlspecialchars($type) . '" data-json=\'' . $dataJSON . '\'></div>';
     }
 
     /**
@@ -365,8 +376,8 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @throws InvalidEmbed
      */
     private function parseYouTubeVideoString($parameters): array {
-        $video_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'video_id' => true, 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
-        $video_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false'], 'height' => ['360', '480', '720', '1080']);
+        $video_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'video_id' => true, 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true', "embed-position" => "block");
+        $video_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false'], 'height' => ['360', '480', '720', '1080'], "embed-position" => ['', 'left', 'centre', 'right', 'block']);
         $regex                  = '/^((?:https?:)?\/\/)?((?:www|m)\.)?(youtube\.com|youtu.be)(\/(?:[\w\-]+\?v=|embed\/|v\/)?)([\w\-]+)(\S+)?$/';
 
         if(preg_match($regex, $parameters['url'], $match)) {
@@ -386,8 +397,8 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @throws InvalidEmbed
      */
     private function parseYouTubePlaylistString($parameters): array {
-        $playlist_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'playlist_id' => true, 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true');
-        $playlist_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false'], 'height' => ['360', '480', '720', '1080']);
+        $playlist_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'playlist_id' => true, 'height' => '720', 'autoplay' => 'false', 'mute' => 'false', 'loop' => 'false', 'controls' => 'true', "embed-position" => "block");
+        $playlist_parameter_values = array('autoplay' => ['', 'true', 'false'], 'mute' => ['', 'true', 'false'], 'loop' => ['', 'true', 'false'], 'controls' => ['', 'true', 'false'], 'height' => ['360', '480', '720', '1080'], "embed-position" => ['', 'left', 'centre', 'right', 'block']);
         $regex                     = '/^.*(youtu.be\/|list=)([^#&?]*).*/';
 
         if(preg_match($regex, $parameters['url'], $matches)) {
@@ -404,8 +415,8 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @throws InvalidEmbed
      */
     private function parseFusionString($parameters): array {
-        $fusion_parameter_types  = array('type' => true, 'url' => true, 'domain' => true, 'width' => '1280', 'height' => '720', 'allowFullScreen' => 'true');
-        $fusion_parameter_values = array('allowFullScreen' => ['true', 'false']);
+        $fusion_parameter_types  = array('type' => true, 'url' => true, 'domain' => true, 'width' => '1280', 'height' => '720', 'allowFullScreen' => 'true', "embed-position" => "block");
+        $fusion_parameter_values = array('allowFullScreen' => ['true', 'false'], "embed-position" => ['', 'left', 'centre', 'right', 'block']);
 
         return $this->checkParameters($parameters, $fusion_parameter_types, $fusion_parameter_values);
     }
@@ -418,8 +429,8 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
      * @throws InvalidEmbed
      */
     private function parseOtherEmbedString($parameters): array {
-        $other_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'width' => '1280', 'height' => '720');
-        $other_parameter_values = array();
+        $other_parameter_types  = array("type" => true, 'url' => true, 'domain' => true, 'width' => '1280', 'height' => '720', "embed-position" => "block");
+        $other_parameter_values = array("embed-position" => ['', 'left', 'centre', 'right', 'block']);
 
         return $this->checkParameters($parameters, $other_parameter_types, $other_parameter_values);
     }

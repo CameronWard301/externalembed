@@ -43,6 +43,13 @@ Required Parameters:
 
 * `url: ` - The URL associated with the embed
 
+Optional Parameters:
+
+* `embed-position:` - Displays the embedded content to the right, left or centre of the page. Values:
+  * `left`
+  * `centre`
+  * `right`
+
 ### YouTube Video:
 
 To display a video from YouTube use the following syntax:  

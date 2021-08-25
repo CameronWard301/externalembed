@@ -1,0 +1,111 @@
+
+.externalembed_TOS {
+    margin-top: 10px;
+    margin-bottom: 10px;
+    text-align: center;
+    overflow: hidden;
+    height: 100%;
+    position: relative;
+    /*max-width: 100%;*/
+}
+
+.externalembed_iframe_container {
+    position: relative;
+    overflow: hidden;
+    width: 100%;
+    padding-top: 56.25%;
+}
+
+.externalembed_iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    right: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.externalembed_height_360 {
+    max-width: 640px;
+}
+
+.externalembed_height_480 {
+    max-width: 854px;
+}
+
+.externalembed_height_720 {
+    max-width: 1280px;
+}
+
+.externalembed_height_1080 {
+    max-width: 1920px;
+}
+
+.externalembed_disclaimer {
+    color: white;
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    display: block;
+    /*transform: translate(0%, -100%);*/
+    transform: translate(-50%);
+    text-align: center;
+    width: 70%;
+    max-width: 100%;
+    background-color: rgba(33, 33, 33, 0.6);
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.externalembed_disclaimer > button {
+    margin: 10px;
+    border: gray;
+    border-radius: 5px;
+
+}
+
+.externalembed_disclaimer a {
+    color: #f84e2e !important;
+    text-decoration: underline !important;
+}
+
+.externalembed_embed > img {
+    -webkit-filter: blur(3px) brightness(50%);
+}
+
+.externalembed_tosRejected {
+    max-width: 300px;
+    background-color: #0000;
+}
+
+.externalembed_tosRejected > .externalembed_disclaimer {
+    position: static;
+    transform: none;
+    text-align: center;
+    max-width: 100%;
+}
+
+.externalembed_accept {
+    color: #FFF;
+    background: #44CC44;
+    padding: 8px 20px;
+    box-shadow: 0 4px 0 0 #2EA62E;
+}
+
+.externalembed_accept:hover {
+    background: #6FE76F;
+    box-shadow: 0 4px 0 0 #7ED37E;
+}
+
+.externalembed_reject {
+    color: #FFF;
+    background: #f84e2e;
+    padding: 8px 20px;
+    box-shadow: 0 4px 0 0 #CB4949;
+}
+
+.externalembed_reject:hover {
+    background: rgb(255, 147, 128);
+    box-shadow: 0 4px 0 0 #EF8282;
+}

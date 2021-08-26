@@ -16,6 +16,10 @@
     padding-top: 56.25%;
 }
 
+.externalembed_other {
+    position: unset !important;
+}
+
 .externalembed_iframe {
     position: absolute;
     top: 0;
@@ -24,6 +28,7 @@
     right: 0;
     width: 100%;
     height: 100%;
+    border: none;
 }
 
 .externalembed_height_360 {
@@ -42,17 +47,24 @@
     max-width: 1920px;
 }
 
-.externalembed_disclaimer {
+.externalembed_disclaimer_youtube_video, .externalembed_disclaimer_youtube_playlist {
     color: white;
     position: absolute;
     bottom: 0;
     left: 50%;
     display: block;
-    /*transform: translate(0%, -100%);*/
     transform: translate(-50%);
     text-align: center;
     width: 70%;
     max-width: 100%;
+    background-color: rgba(33, 33, 33, 0.6);
+    border-radius: 10px;
+    padding: 10px;
+}
+
+.externalembed_disclaimer_other {
+    color: white;
+    display: inline-block;
     background-color: rgba(33, 33, 33, 0.6);
     border-radius: 10px;
     padding: 10px;

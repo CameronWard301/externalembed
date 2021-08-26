@@ -233,13 +233,17 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
         $parameters['disclaimer'] = DEFAULT_PRIVACY_DISCLAIMER;
         $parameters['request']    = $request;
         $type                     = $parameters['type'];
-        $parameters['size']       = $this->getEmbedSize($parameters);
+        if($type !== 'other') {
+            $parameters['size'] = $this->getEmbedSize($parameters);
+        } else {
+            $parameters['size'] = '';
+        }
 
         if($parameters['embed-position'] == "centre") {
             $position = "mediacenter";
-        } elseif($parameters['embed-position'] == 'right') {
+        } else if($parameters['embed-position'] == 'right') {
             $position = "mediaright";
-        } elseif($parameters['embed-position'] == "left") {
+        } else if($parameters['embed-position'] == "left") {
             $position = "medialeft";
         } else {
             $position = '';
@@ -248,7 +252,6 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
         //remove unnecessary parameters that don't need to be sent
         unset(
             $parameters['url'],
-            $parameters['type'],
             $parameters['autoplay'],
             $parameters['loop'],
             $parameters['mute'],
@@ -262,7 +265,7 @@ class syntax_plugin_externalembed extends DokuWiki_Syntax_Plugin {
             }
         }
         $dataJSON = json_encode(array_map("utf8_encode", $parameters));
-        return '<div class="' . $position . ' externalembed_embed externalembed_TOS ' . $parameters['size'] . ' externalembed_embedType-' . htmlspecialchars($type) . '" data-json=\'' . $dataJSON . '\'></div>';
+        return '<div class="' . $position . ' externalembed_embed externalembed_TOS ' . $parameters['size'] . '" data-json=\'' . $dataJSON . '\'></div>';
     }
 
     /**

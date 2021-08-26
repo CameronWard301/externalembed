@@ -1,7 +1,7 @@
 base   externalembed
 author Cameron
 email  cameronward007@gmail.com
-date   2021-08-25
+date   2021-08-26
 name   externalembed plugin
 desc   Embeds the latest video from a YouTube Playlist, embed external content from whitelisted domains
 url    https://www.dokuwiki.org/

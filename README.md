@@ -59,6 +59,8 @@ Optional Parameters:
   * `left`
   * `centre`
   * `right`
+* `width: ` - The width of the embedded content. Enter a number with no units e.g. `width: "300"`
+* `height: ` - the height of the embedded content. Enter a number with no units e.g. `height: "600"`
 
 ### YouTube Video:
 
